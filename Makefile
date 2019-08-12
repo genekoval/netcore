@@ -24,8 +24,8 @@ endif
 SRC := $(wildcard $(SRCDIR)/*.cpp)
 OBJ := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRC))
 TARGET = $(LIBDIR)/$(LIBFILE)
-HEADERS := $(wildcard $(INCDIR)/*.h)
 HINSTALL = $(INCDIR)/$(NAMESPACE)
+HEADERS := $(wildcard $(HINSTALL)/*.h)
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.cpp
 	$(CC) -o $@ -c -fpic $(CCFLAGS) $^
