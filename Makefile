@@ -4,7 +4,7 @@ NAMESPACE = nova
 
 BUILD = .
 PREFIX = $(DEVROOT)
-RELEASE = false
+DIST = false
 
 LIBRARY = lib$(PROJECT).so
 LIBFILE = $(LIBRARY).$(VERSION)
@@ -16,12 +16,9 @@ LIBDIR = $(BUILD)/lib
 
 CC = g++
 CCFLAGS = -I $(INCDIR) -std=gnu++17 -Wall
-BUILDFLAGS =
 
-ifeq ($(RELEASE),false)
-	DEVLIB = $(DEVROOT)/lib
+ifeq ($(DIST),false)
 	CCFLAGS += -I $(DEVROOT)/include
-	BUILDFLAGS += -L$(DEVLIB) -Wl,-rpath=$(DEVLIB)
 endif
 
 SRC := $(wildcard $(SRCDIR)/*.cpp)
@@ -34,7 +31,7 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.cpp
 	$(CC) -o $@ -c -fpic $(CCFLAGS) $^
 
 $(TARGET) : $(OBJ)
-	$(CC) -o $@ -shared $(BUILDFLAGS) $(CCFLAGS) $^
+	$(CC) -o $@ -shared $(CCFLAGS) $^
 
 .PHONY: all clean dir install version
 
