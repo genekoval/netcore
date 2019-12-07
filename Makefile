@@ -1,56 +1,11 @@
-PROJECT = netcode
-VERSION = 0.1.0
-NAMESPACE = nova
+project = netcode
+version = 0.1.0
 
-BUILD = .
-PREFIX = $(DEVROOT)
-DIST = false
+library = lib$(project)
 
-LIBRARY = lib$(PROJECT).so
-LIBFILE = $(LIBRARY).$(VERSION)
+install := $(library)
+targets := $(install)
 
-INCDIR = include
-SRCDIR = src
-OBJDIR = $(BUILD)/obj
-LIBDIR = $(BUILD)/lib
+$(library).type = shared
 
-CC = g++
-CCFLAGS = -I $(INCDIR) -std=gnu++17 -Wall
-
-ifeq ($(DIST),false)
-	CCFLAGS += -I $(DEVROOT)/include
-endif
-
-SRC := $(wildcard $(SRCDIR)/*.cpp)
-OBJ := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRC))
-TARGET = $(LIBDIR)/$(LIBFILE)
-HINSTALL = $(INCDIR)/$(NAMESPACE)
-HEADERS := $(wildcard $(HINSTALL)/*.h)
-
-$(OBJDIR)/%.o : $(SRCDIR)/%.cpp
-	$(CC) -o $@ -c -fpic $(CCFLAGS) $^
-
-$(TARGET) : $(OBJ)
-	$(CC) -o $@ -shared $(CCFLAGS) $^
-
-.PHONY: all clean dir install version
-
-all : dir $(TARGET)
-
-clean :
-	rm -rf $(OBJDIR) $(LIBDIR)
-
-dir :
-	@mkdir -p $(OBJDIR) $(LIBDIR)
-
-install :
-	@mkdir -p $(PREFIX)/{$(HINSTALL),$(LIBDIR)}
-	@echo COPY header files
-	@cp -v $(HEADERS) $(PREFIX)/$(HINSTALL)
-	@echo INSTALL $(PREFIX)/$(TARGET)
-	@cp $(TARGET) $(PREFIX)/$(LIBDIR)
-	@cd $(PREFIX)/$(LIBDIR) && ln -sf $(LIBFILE) $(LIBRARY)
-
-version :
-	@echo Project: $(PROJECT)
-	@echo Version: $(VERSION)
+include $(DEVROOT)/include/mkbuild/base.mk
