@@ -1,7 +1,7 @@
 #include <iostream>
 #include <timber/timber>
 
-auto timber::write(const timber::log& log) noexcept -> void {
+auto timber::handle_log(const timber::log& log) noexcept -> void {
     std::cerr
         << '[' << log.log_level << "] "
         << log.stream.str()
