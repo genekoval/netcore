@@ -43,7 +43,7 @@ namespace netcore::cli {
     }
 
     auto route(socket&& client) -> void {
-        auto request = json::parse(client.receive());
+        auto request = json::parse(client.recv());
 
         DEBUG() << "Received: " << request.dump(indent);
 

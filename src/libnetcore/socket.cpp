@@ -55,13 +55,13 @@ namespace netcore {
 
     auto socket::fd() const -> int { return sockfd; }
 
-    auto socket::receive() const -> std::string {
+    auto socket::recv() const -> std::string {
         auto data = std::string();
         char buffer[recv_buffer_size];
         auto byte_count = 0;
 
         do {
-            byte_count = recv(sockfd, buffer, recv_buffer_size, 0);
+            byte_count = ::recv(sockfd, buffer, recv_buffer_size, 0);
             if (byte_count > 0) data.append(buffer, byte_count);
         } while (byte_count > 0);
 
@@ -72,21 +72,29 @@ namespace netcore {
         return data;
     }
 
-    auto socket::send(const std::string& data) const -> void {
-        TRACE() << *this << " sending string data";
-        DEBUG() << *this << " sending " << data.size() << " bytes";
+    auto socket::recv(void* buffer, std::size_t len) const -> ssize_t {
+        auto bytes = ::recv(sockfd, buffer, len, 0);
 
-        auto bytes_sent = ::send(
-            sockfd,
-            data.c_str(),
-            data.size(),
-            MSG_NOSIGNAL
-        );
-
-        if (bytes_sent == -1) {
-            ERROR() << *this << " failed to send: " << std::strerror(errno);
+        if (bytes == -1 && (errno != EAGAIN || errno != EWOULDBLOCK)) {
+            throw ext::system_error("failed to receive data");
         }
-        else DEBUG() << *this << " sent " << bytes_sent << " bytes";
+
+        return bytes;
+    }
+
+    auto socket::send(const void* data, std::size_t len) const -> void {
+        DEBUG() << *this << " sending " << len << " bytes";
+
+        auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
+
+        if (bytes == -1) {
+            throw ext::system_error("failed to send data");
+        }
+        else DEBUG() << *this << " sent " << bytes << " bytes";
+    }
+
+    auto socket::send(std::string_view string) const -> void {
+        send(string.data(), string.size());
     }
 
     auto socket::valid() const -> bool { return sockfd != invalid_socket; }

@@ -15,7 +15,7 @@ static auto $start(
 ) -> void {
     timber::reporting_level() = log_level;
 
-    INFO ()
+    INFO()
         << app.name
         << " version " << app.version
         << " starting: [PID " << getpid() << ']';
