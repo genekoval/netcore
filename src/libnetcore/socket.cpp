@@ -72,10 +72,11 @@ namespace netcore {
         return data;
     }
 
-    auto socket::recv(void* buffer, std::size_t len) const -> ssize_t {
+    auto socket::recv(void* buffer, std::size_t len) const -> std::size_t {
         auto bytes = ::recv(sockfd, buffer, len, 0);
 
-        if (bytes == -1 && (errno != EAGAIN || errno != EWOULDBLOCK)) {
+        if (bytes < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
             throw ext::system_error("failed to receive data");
         }
 

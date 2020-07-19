@@ -20,7 +20,7 @@ namespace netcore {
         auto close() -> void;
         auto fd() const -> int;
         auto recv() const -> std::string;
-        auto recv(void* buffer, std::size_t len) const -> ssize_t;
+        auto recv(void* buffer, std::size_t len) const -> std::size_t;
         auto send(const void* data, std::size_t len) const -> void;
         auto send(std::string_view string) const -> void;
         auto valid() const -> bool;
