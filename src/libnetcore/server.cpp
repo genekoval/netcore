@@ -11,11 +11,6 @@
 
 namespace fs = std::filesystem;
 
-template <typename T>
-auto listening(const T& endpoint) -> void {
-    INFO() << "Listening for connections on: " << endpoint;
-}
-
 namespace netcore {
     server::server(const connection_handler on_connection) :
         on_connection(on_connection)
@@ -93,13 +88,18 @@ namespace netcore {
         INFO() << "signal (" << signal << "): " << strsignal(signal);
     }
 
-    auto server::listen(const fs::path& path, int backlog) -> void {
-        listen(path, fs::perms::unknown, backlog);
+    auto server::listen(
+        const fs::path& path,
+        const std::function<void()>& callback,
+        int backlog
+    ) -> void {
+        listen(path, fs::perms::unknown, callback, backlog);
     }
 
     auto server::listen(
         const fs::path& path,
         fs::perms perms,
+        const std::function<void()>& callback,
         int backlog
     ) -> void {
         sock = socket(AF_UNIX, SOCK_STREAM);
@@ -131,7 +131,7 @@ namespace netcore {
         if (perms != fs::perms::unknown) fs::permissions(path, perms);
 
         // Handle connections.
-        listen(backlog, [&path]() { listening(path); });
+        listen(backlog, callback);
 
         // The server is shutting down. Clean up.
         fs::remove(path);

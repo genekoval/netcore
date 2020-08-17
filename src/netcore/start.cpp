@@ -26,7 +26,9 @@ static auto $start(
     sock /= app.name;
     sock += ".sock";
 
-    server.listen(sock);
+    server.listen(sock, [&sock]() {
+        INFO() << "Listening for connections on: " << sock;
+    });
 
     INFO() << "Shuting down...";
 }

@@ -27,12 +27,14 @@ namespace netcore {
 
         auto listen(
             const std::filesystem::path& path,
+            const std::function<void()>& callback,
             int backlog = SOMAXCONN
         ) -> void;
 
         auto listen(
             const std::filesystem::path& path,
             std::filesystem::perms perms,
+            const std::function<void()>& callback,
             int backlog = SOMAXCONN
         ) -> void;
     };
