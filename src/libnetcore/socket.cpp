@@ -42,12 +42,13 @@ namespace netcore {
     }
 
     auto socket::close() -> void {
-        TRACE() << *this << " closing...";
-
         if (!valid()) return;
 
         if (::close(sockfd) == -1) {
             ERROR() << *this << " failed to close: " << std::strerror(errno);
+        }
+        else {
+            DEBUG() << *this << " closed";
         }
 
         sockfd = -1; // Invalidate this socket instance.
@@ -80,18 +81,29 @@ namespace netcore {
             throw ext::system_error("failed to receive data");
         }
 
+        if (static_cast<std::size_t>(bytes) < len) {
+            WARN()
+                << *this << " recv " << bytes << " bytes; expected " << len;
+        }
+
+        DEBUG() << *this << " recv " << bytes << " bytes";
+
         return bytes;
     }
 
     auto socket::send(const void* data, std::size_t len) const -> void {
-        DEBUG() << *this << " sending " << len << " bytes";
-
         auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
 
         if (bytes == -1) {
             throw ext::system_error("failed to send data");
         }
-        else DEBUG() << *this << " sent " << bytes << " bytes";
+
+        if (static_cast<std::size_t>(bytes) < len) {
+            WARN()
+                << *this << " send " << bytes << " bytes; expected " << len;
+        }
+
+        DEBUG() << *this << " send " << bytes << " bytes";
     }
 
     auto socket::send(std::string_view string) const -> void {
