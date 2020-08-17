@@ -35,10 +35,6 @@ namespace netcore {
             throw ext::system_error("Failed to get client flags");
         }
 
-        if (fcntl(client, F_SETFL, client_flags | O_NONBLOCK) == -1) {
-            throw ext::system_error("Failed to set client flags");
-        }
-
         return client;
     }
 
