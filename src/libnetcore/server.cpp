@@ -59,7 +59,7 @@ namespace netcore {
         monitor.add(sock);
 
         // Event types for client and signal sockets.
-        monitor.set(EPOLLIN | EPOLLET | EPOLLRDHUP);
+        monitor.set(EPOLLIN | EPOLLRDHUP);
 
         const auto sigfd = signalfd::create({SIGINT, SIGTERM});
         monitor.add(sigfd.fd());
