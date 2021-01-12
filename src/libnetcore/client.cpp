@@ -21,7 +21,7 @@ namespace netcore {
             );
         }
 
-        INFO() << "Connected to: " << path;
+        DEBUG() << "Connected to: " << path;
 
         return sock;
     }
