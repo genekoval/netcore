@@ -51,7 +51,7 @@ namespace netcore {
             DEBUG() << *this << " closed";
         }
 
-        sockfd = -1; // Invalidate this socket instance.
+        sockfd = invalid_socket;
     }
 
     auto socket::fd() const -> int { return sockfd; }

@@ -68,12 +68,19 @@ namespace netcore {
 
         do {
             monitor.wait([&](const epoll_event& event) {
+                auto current = event.data.fd;
+
                 if (event.events & EPOLLRDHUP) {
-                    WARN() << "Client disconnect";
+                    // We need to call `close()` on this file descriptor.
+                    // Create a socket instance, which will close
+                    // the connection upon destruction.
+                    auto s = socket(current);
+
+                    DEBUG() << s << " peer closed connection, "
+                        << "or shut down writing half of connection";
+
                     return;
                 }
-
-                auto current = event.data.fd;
 
                 if (current == sock.fd()) monitor.add(accept());
                 else if (current == sigfd.fd()) signal = sigfd.signal();
