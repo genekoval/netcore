@@ -18,16 +18,16 @@ namespace netcore {
 
     socket::socket(int fd) : sockfd(fd) {
         TRACE() << *this << " created from existing file descriptor";
+        DEBUG() << *this << " created";
     }
 
-    socket::socket(int domain, int type) :
-        socket(::socket(domain, type, 0))
-    {
+    socket::socket(int domain, int type) : socket(::socket(domain, type, 0)) {
         if (!valid()) throw ext::system_error("Failed to create socket");
-        TRACE() << *this << " created";
     }
 
     socket::~socket() {
+        if (!valid()) return;
+
         TRACE() << *this << " destructor called";
         close();
     }
@@ -42,8 +42,6 @@ namespace netcore {
     }
 
     auto socket::close() -> void {
-        if (!valid()) return;
-
         if (::close(sockfd) == -1) {
             ERROR() << *this << " failed to close: " << std::strerror(errno);
         }
@@ -95,6 +93,7 @@ namespace netcore {
         auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
 
         if (bytes == -1) {
+            DEBUG() << *this << " failed to send data";
             throw ext::system_error("failed to send data");
         }
 
