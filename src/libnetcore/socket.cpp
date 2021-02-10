@@ -87,11 +87,6 @@ namespace netcore {
             throw ext::system_error("failed to receive data");
         }
 
-        if (static_cast<std::size_t>(bytes) < len) {
-            WARN()
-                << *this << " recv " << bytes << " bytes; expected " << len;
-        }
-
         DEBUG() << *this << " recv " << bytes << " bytes";
 
         return bytes;
