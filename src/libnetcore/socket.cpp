@@ -52,6 +52,14 @@ namespace netcore {
         sockfd = invalid_socket;
     }
 
+    auto socket::end() const -> void {
+        if (shutdown(sockfd, SHUT_WR) == -1) {
+            throw ext::system_error("failed to shutdown further transmissions");
+        }
+
+        DEBUG() << *this << " shutdown transmissions";
+    }
+
     auto socket::fd() const -> int { return sockfd; }
 
     auto socket::recv() const -> std::string {

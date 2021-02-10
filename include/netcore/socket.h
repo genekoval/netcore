@@ -18,6 +18,7 @@ namespace netcore {
         auto operator=(socket&& other) noexcept -> socket&;
 
         auto close() -> void;
+        auto end() const -> void;
         auto fd() const -> int;
         auto recv() const -> std::string;
         auto recv(void* buffer, std::size_t len) const -> std::size_t;
