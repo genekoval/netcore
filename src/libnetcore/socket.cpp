@@ -29,23 +29,6 @@ namespace netcore {
         DEBUG() << *this << " shutdown transmissions";
     }
 
-    auto socket::recv() const -> std::string {
-        auto data = std::string();
-        char buffer[recv_buffer_size];
-        auto byte_count = 0;
-
-        do {
-            byte_count = ::recv(sockfd, buffer, recv_buffer_size, 0);
-            if (byte_count > 0) data.append(buffer, byte_count);
-        } while (byte_count > 0);
-
-        if (byte_count == -1 && errno != EAGAIN) {
-            ERROR() << *this << " failed to read: " << std::strerror(errno);
-        }
-
-        return data;
-    }
-
     auto socket::recv(void* buffer, std::size_t len) const -> std::size_t {
         auto bytes = ::recv(sockfd, buffer, len, 0);
 
@@ -73,10 +56,6 @@ namespace netcore {
         }
 
         DEBUG() << *this << " send " << bytes << " bytes";
-    }
-
-    auto socket::send(std::string_view string) const -> void {
-        send(string.data(), string.size());
     }
 
     auto socket::valid() const -> bool { return sockfd.valid(); }
