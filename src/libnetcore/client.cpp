@@ -21,7 +21,7 @@ namespace netcore {
 
         auto sock = socket(result->ai_family, result->ai_socktype);
 
-        if (::connect(sock.fd(), result->ai_addr, result->ai_addrlen) == -1) {
+        if (::connect(sock, result->ai_addr, result->ai_addrlen) == -1) {
             throw ext::system_error(
                 "failed to connect to: " +
                 std::string(host) + ":" + std::string(port)
@@ -41,7 +41,7 @@ namespace netcore {
 
         auto sock = socket(AF_UNIX, SOCK_STREAM);
 
-        if (::connect(sock.fd(), (sockaddr*) &addr, sizeof(addr)) == -1) {
+        if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) == -1) {
             throw ext::system_error(
                 "failed to connect to: " + std::string(path)
             );

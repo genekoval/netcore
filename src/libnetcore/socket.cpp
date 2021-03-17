@@ -9,48 +9,17 @@
 #include <utility>
 
 constexpr auto recv_buffer_size = 256;
-constexpr auto invalid_socket = -1;
 
 namespace netcore {
-    socket::socket() : sockfd(invalid_socket) {
-        TRACE() << "Placeholder socket created";
-    }
-
     socket::socket(int fd) : sockfd(fd) {
-        TRACE() << *this << " created from existing file descriptor";
         DEBUG() << *this << " created";
     }
 
     socket::socket(int domain, int type) : socket(::socket(domain, type, 0)) {
-        if (!valid()) throw ext::system_error("Failed to create socket");
+        if (!sockfd.valid()) throw ext::system_error("Failed to create socket");
     }
 
-    socket::~socket() {
-        if (!valid()) return;
-
-        TRACE() << *this << " destructor called";
-        close();
-    }
-
-    socket::socket(socket&& other) noexcept :
-        sockfd(std::exchange(other.sockfd, invalid_socket))
-    {}
-
-    auto socket::operator=(socket&& other) noexcept -> socket& {
-        sockfd = std::exchange(other.sockfd, invalid_socket);
-        return *this;
-    }
-
-    auto socket::close() -> void {
-        if (::close(sockfd) == -1) {
-            ERROR() << *this << " failed to close: " << std::strerror(errno);
-        }
-        else {
-            DEBUG() << *this << " closed";
-        }
-
-        sockfd = invalid_socket;
-    }
+    socket::operator int() const { return sockfd; }
 
     auto socket::end() const -> void {
         if (shutdown(sockfd, SHUT_WR) == -1) {
@@ -59,8 +28,6 @@ namespace netcore {
 
         DEBUG() << *this << " shutdown transmissions";
     }
-
-    auto socket::fd() const -> int { return sockfd; }
 
     auto socket::recv() const -> std::string {
         auto data = std::string();
@@ -112,10 +79,10 @@ namespace netcore {
         send(string.data(), string.size());
     }
 
-    auto socket::valid() const -> bool { return sockfd != invalid_socket; }
+    auto socket::valid() const -> bool { return sockfd.valid(); }
 
     auto operator<<(std::ostream& os, const socket& sock) -> std::ostream& {
-        os << "socket (" << sock.fd() << ")";
+        os << "socket (" << static_cast<int>(sock) << ")";
         return os;
     }
 }

@@ -28,7 +28,12 @@ namespace netcore {
         TRACE() << this << " move constructed";
     }
 
-    fd::~fd() { close(); }
+    fd::~fd() {
+        if (descriptor == invalid) return;
+        close();
+    }
+
+    fd::operator int() const { return descriptor; }
 
     auto fd::operator=(fd&& other) noexcept -> fd& {
         descriptor = std::exchange(other.descriptor, invalid);
@@ -36,11 +41,7 @@ namespace netcore {
         return *this;
     }
 
-    fd::operator int() const { return descriptor; }
-
     auto fd::close() noexcept -> void {
-        if (descriptor == invalid) return;
-
         if (::close(descriptor) == -1) {
             ERROR() << this << " failed to close: " << std::strerror(errno);
         }
@@ -50,4 +51,6 @@ namespace netcore {
 
         descriptor = invalid;
     }
+
+    auto fd::valid() const -> bool { return descriptor != invalid; }
 }

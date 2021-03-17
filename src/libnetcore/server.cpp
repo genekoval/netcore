@@ -12,6 +12,11 @@
 namespace fs = std::filesystem;
 
 namespace netcore {
+    constexpr int stop_signals[] = {
+        SIGINT,
+        SIGTERM
+    };
+
     server::server(const connection_handler on_connection) :
         on_connection(on_connection)
     {}
@@ -24,7 +29,7 @@ namespace netcore {
         auto client_addr = sockaddr_storage();
         socklen_t addrlen = sizeof(client_addr);
 
-        auto client = ::accept(sock.fd(), (sockaddr*) &client_addr, &addrlen);
+        auto client = ::accept(sock, (sockaddr*) &client_addr, &addrlen);
 
         if (client == -1) {
             throw ext::system_error("Failed to accpet client connection");
@@ -42,7 +47,7 @@ namespace netcore {
         int backlog,
         const std::function<void()>& callback
     ) const -> void {
-        if (::listen(sock.fd(), backlog) == -1) {
+        if (::listen(sock, backlog) == -1) {
             throw ext::system_error("Socket listen failure");
         }
 
@@ -60,8 +65,8 @@ namespace netcore {
         // Event types for client and signal sockets.
         monitor.set(EPOLLIN | EPOLLRDHUP);
 
-        const auto sigfd = signalfd::create({SIGINT, SIGTERM});
-        monitor.add(sigfd.fd());
+        const auto sigfd = signalfd::create(std::span(stop_signals));
+        monitor.add(sigfd);
 
         callback();
 
@@ -83,9 +88,11 @@ namespace netcore {
                     return;
                 }
 
-                if (current == sock.fd()) monitor.add(accept());
-                else if (current == sigfd.fd()) signal = sigfd.signal();
-                else on_connection(socket(current));
+                if (current == static_cast<int>(sock)) monitor.add(accept());
+                else if (current == static_cast<int>(sigfd)) {
+                    signal = sigfd.signal();
+                }
+                else on_connection(current);
             });
         } while (!signal);
 
@@ -123,7 +130,7 @@ namespace netcore {
         // Assign a socket file to the server socket.
         // This creates the file.
         if (bind(
-            sock.fd(),
+            sock,
             (sockaddr*) &server_address,
             sizeof(sockaddr_un)
         ) == -1) {

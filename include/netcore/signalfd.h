@@ -1,18 +1,20 @@
 #pragma once
 
-#include <netcore/socket.h>
+#include <netcore/fd.h>
 
-#include <vector>
+#include <cstdint>
+#include <span>
 
 namespace netcore {
     class signalfd {
-        socket sock;
+        const fd descriptor;
 
-        signalfd(int fd);
+        signalfd(int descriptor);
     public:
-        static auto create(const std::vector<int>& signals) -> signalfd;
+        static auto create(std::span<const int> signals) -> signalfd;
 
-        auto fd() const -> int;
-        auto signal() const -> uint32_t;
+        operator int() const;
+
+        auto signal() const -> std::uint32_t;
     };
 }

@@ -7,9 +7,13 @@
 #include <unistd.h>
 
 namespace netcore {
-    signalfd::signalfd(int fd) : sock(fd) {}
+    signalfd::signalfd(int descriptor) : descriptor(descriptor) {
+        DEBUG() << "signalfd (" << descriptor << ") created";
+    }
 
-    auto signalfd::create(const std::vector<int>& signals) -> signalfd {
+    signalfd::operator int() const { return descriptor; }
+
+    auto signalfd::create(std::span<const int> signals) -> signalfd {
         auto mask = sigset_t();
         sigemptyset(&mask);
 
@@ -19,27 +23,24 @@ namespace netcore {
             throw ext::system_error("sigprocmask failure");
         }
 
-        auto sig = signalfd(::signalfd(-1, &mask, 0));
-        if (!sig.sock.valid()) {
+        auto descriptor = ::signalfd(-1, &mask, 0);
+        if (descriptor == -1) {
             throw ext::system_error("signalfd create failure");
         }
 
-        TRACE() << sig.sock << " signalfd created";
-
-        return sig;
+        return descriptor;
     }
 
-    auto signalfd::fd() const -> int { return sock.fd(); }
+    auto signalfd::signal() const -> std::uint32_t {
+        constexpr auto infolen = sizeof(signalfd_siginfo);
 
-    auto signalfd::signal() const -> uint32_t {
-        auto fdsi = signalfd_siginfo();
-        const auto infolen = sizeof(signalfd_siginfo);
+        auto info = signalfd_siginfo();
 
-        const auto bytes_read = read(fd(), &fdsi, infolen);
-        if (bytes_read != infolen) {
+        const auto bytes = read(descriptor, &info, infolen);
+        if (bytes != infolen) {
             throw ext::system_error("Failure to read signalfd signal");
         }
 
-        return fdsi.ssi_signo;
+        return info.ssi_signo;
     }
 }

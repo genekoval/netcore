@@ -14,9 +14,11 @@ namespace netcore {
 
         ~fd();
 
+        operator int() const;
+
         auto operator=(const fd&) -> fd& = delete;
         auto operator=(fd&& other) noexcept -> fd&;
 
-        operator int() const;
+        auto valid() const -> bool;
     };
 }

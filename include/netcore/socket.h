@@ -1,25 +1,21 @@
 #pragma once
 
-#include <string>
+#include <netcore/fd.h>
+
 #include <sstream>
+#include <string>
 
 namespace netcore {
     class socket {
-        int sockfd;
+        fd sockfd;
     public:
-        socket();
+        socket() = default;
         socket(int fd);
         socket(int domain, int type);
-        ~socket();
-        socket(const socket&) = delete;
-        socket(socket&& other) noexcept;
 
-        auto operator=(const socket&) -> socket& = delete;
-        auto operator=(socket&& other) noexcept -> socket&;
+        operator int() const;
 
-        auto close() -> void;
         auto end() const -> void;
-        auto fd() const -> int;
         auto recv() const -> std::string;
         auto recv(void* buffer, std::size_t len) const -> std::size_t;
         auto send(const void* data, std::size_t len) const -> void;
