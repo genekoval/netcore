@@ -5,8 +5,8 @@ STD := gnu++2a
 
 library = lib$(project)
 
-targets := $(library) $(project)
 install := $(library)
+targets := $(install)
 
 $(library).type = shared
 define $(library).libs
@@ -14,22 +14,14 @@ define $(library).libs
  timber
 endef
 
-$(project).type = executable
-define $(project).libs
+test.deps = $(library)
+define test.libs
  $(project)
- commline
+ gtest
+ gtest_main
  timber
-endef
-define $(project).deps
- $(library)
 endef
 
 include mkbuild/base.mk
 
-$(project).main := $(obj)/$(project)/main.o
-
-$($(project).main): CXXFLAGS += -DNAME=\"$(project)\" -DVERSION=\"$(version)\"
-
-.PHONY: test.integration
-test.integration:
-	@node $(src)/$(project)-test/main.js $(project)
+$($(test).objects): CXXFLAGS += -DTESTDIR='"$(build)"'

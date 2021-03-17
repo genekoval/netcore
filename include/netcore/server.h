@@ -38,4 +38,27 @@ namespace netcore {
             int backlog = SOMAXCONN
         ) -> void;
     };
+
+    class fork_server {
+        pid_t pid;
+        server m_server;
+    public:
+        enum class process_type {
+            client,
+            server
+        };
+
+        fork_server(const connection_handler on_connection);
+
+        auto start(
+            const std::filesystem::path& path,
+            std::filesystem::perms perms,
+            const std::function<void()>& callback,
+            int backlog = SOMAXCONN
+        ) -> process_type;
+
+        auto stop() -> int;
+
+        auto stop(int signal) -> int;
+    };
 }

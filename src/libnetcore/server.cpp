@@ -47,7 +47,6 @@ namespace netcore {
         }
 
         DEBUG() << sock << " listening for connections";
-        callback();
 
         // Leave room for:
         //      1. a full backlog of clients;
@@ -63,6 +62,8 @@ namespace netcore {
 
         const auto sigfd = signalfd::create({SIGINT, SIGTERM});
         monitor.add(sigfd.fd());
+
+        callback();
 
         auto signal = 0;
 
@@ -136,7 +137,8 @@ namespace netcore {
         // Handle connections.
         listen(backlog, callback);
 
-        // The server is shutting down. Clean up.
-        fs::remove(path);
+        if (fs::remove(path)) {
+            DEBUG() << "Removed socket file: " << path;
+        }
     }
 }

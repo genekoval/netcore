@@ -1,6 +1,3 @@
-node_modules
-socket.txt
-
 # Files removed by 'make clean' {{{
 bin
 obj
