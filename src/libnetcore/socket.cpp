@@ -8,8 +8,6 @@
 #include <unistd.h>
 #include <utility>
 
-constexpr auto recv_buffer_size = 256;
-
 namespace netcore {
     socket::socket(int fd) : sockfd(fd) {
         DEBUG() << *this << " created";
@@ -29,7 +27,7 @@ namespace netcore {
         DEBUG() << *this << " shutdown transmissions";
     }
 
-    auto socket::recv(void* buffer, std::size_t len) const -> std::size_t {
+    auto socket::read(void* buffer, std::size_t len) const -> std::size_t {
         auto bytes = ::recv(sockfd, buffer, len, 0);
 
         if (bytes < 0) {
@@ -42,7 +40,9 @@ namespace netcore {
         return bytes;
     }
 
-    auto socket::send(const void* data, std::size_t len) const -> void {
+    auto socket::valid() const -> bool { return sockfd.valid(); }
+
+    auto socket::write(const void* data, std::size_t len) const -> std::size_t {
         auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
 
         if (bytes == -1) {
@@ -50,15 +50,10 @@ namespace netcore {
             throw ext::system_error("failed to send data");
         }
 
-        if (static_cast<std::size_t>(bytes) < len) {
-            WARN()
-                << *this << " send " << bytes << " bytes; expected " << len;
-        }
-
         DEBUG() << *this << " send " << bytes << " bytes";
-    }
 
-    auto socket::valid() const -> bool { return sockfd.valid(); }
+        return bytes;
+    }
 
     auto operator<<(std::ostream& os, const socket& sock) -> std::ostream& {
         os << "socket (" << static_cast<int>(sock) << ")";

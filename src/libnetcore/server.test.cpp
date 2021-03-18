@@ -11,11 +11,11 @@ const auto socket_path = std::filesystem::path(TESTDIR) / socket_name;
 
 const auto increment = [](auto&& socket) {
     auto number = std::int32_t();
-    socket.recv(&number, sizeof(number));
+    socket.read(&number, sizeof(number));
     DEBUG() << "increment: received " << number;
 
     number++;
-    socket.send(&number, sizeof(number));
+    socket.write(&number, sizeof(number));
 };
 
 TEST(ServerTest, StartStop) {
@@ -54,8 +54,8 @@ TEST(ServerTest, Connection) {
     auto client = netcore::connect(socket_path.string());
     auto result = 0;
 
-    client.send(&number, sizeof(number));
-    client.recv(&result, sizeof(result));
+    client.write(&number, sizeof(number));
+    client.read(&result, sizeof(result));
 
     ASSERT_EQ(number + 1, result);
 

@@ -16,9 +16,9 @@ namespace netcore {
         operator int() const;
 
         auto end() const -> void;
-        auto recv(void* buffer, std::size_t len) const -> std::size_t;
-        auto send(const void* data, std::size_t len) const -> void;
+        auto read(void* buffer, std::size_t len) const -> std::size_t;
         auto valid() const -> bool;
+        auto write(const void* data, std::size_t len) const -> std::size_t;
     };
 
     auto operator<<(std::ostream& os, const socket& sock) -> std::ostream&;
