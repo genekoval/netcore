@@ -3,6 +3,7 @@
 #include <cstring>
 #include <ext/except.h>
 #include <iostream>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <timber/timber>
 #include <unistd.h>
@@ -30,7 +31,7 @@ namespace netcore {
     auto socket::read(void* buffer, std::size_t len) const -> std::size_t {
         auto bytes = ::recv(sockfd, buffer, len, 0);
 
-        if (bytes < 0) {
+        if (bytes == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
             throw ext::system_error("failed to receive data");
         }
@@ -38,6 +39,28 @@ namespace netcore {
         DEBUG() << *this << " recv " << bytes << " bytes";
 
         return bytes;
+    }
+
+    auto socket::sendfile(const fd& descriptor, std::size_t count) const -> void {
+        auto sent = std::size_t();
+        auto offset = off_t();
+
+        while (sent < count) {
+            const auto bytes = ::sendfile(
+                sockfd,
+                descriptor,
+                &offset,
+                count - sent
+            );
+
+            if (bytes == -1) throw ext::system_error("sendfile failure");
+
+            sent += bytes;
+
+            DEBUG()
+                << *this << " send " << bytes << " bytes (sendfile ["
+                << sent << "/" << count << "])";
+        }
     }
 
     auto socket::valid() const -> bool { return sockfd.valid(); }
