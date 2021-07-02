@@ -1,5 +1,6 @@
 #pragma once
 
+#include <netcore/unix_socket.h>
 #include <netcore/socket.h>
 
 #include <filesystem>
@@ -26,14 +27,7 @@ namespace netcore {
         auto operator=(const server&) -> server& = delete;
 
         auto listen(
-            const std::filesystem::path& path,
-            const std::function<void()>& callback,
-            int backlog = SOMAXCONN
-        ) -> void;
-
-        auto listen(
-            const std::filesystem::path& path,
-            std::filesystem::perms perms,
+            const unix_socket& un,
             const std::function<void()>& callback,
             int backlog = SOMAXCONN
         ) -> void;
@@ -51,8 +45,7 @@ namespace netcore {
         fork_server(const connection_handler on_connection);
 
         auto start(
-            const std::filesystem::path& path,
-            std::filesystem::perms perms,
+            const unix_socket& un,
             const std::function<void()>& callback,
             int backlog = SOMAXCONN
         ) -> process_type;

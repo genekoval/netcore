@@ -4,10 +4,16 @@
 #include <gtest/gtest.h>
 #include <timber/timber>
 
+namespace fs = std::filesystem;
+
 using type = netcore::fork_server::process_type;
 
 constexpr auto socket_name = "netcore.sock";
-const auto socket_path = std::filesystem::path(TESTDIR) / socket_name;
+
+const auto unix_socket = netcore::unix_socket {
+    .path = fs::path(TESTDIR) / socket_name,
+    .mode = fs::perms::owner_read | fs::perms::owner_write
+};
 
 const auto increment = [](auto&& socket) {
     auto number = std::int32_t();
@@ -22,17 +28,16 @@ TEST(ServerTest, StartStop) {
     auto server = netcore::fork_server(increment);
 
     if (type::server == server.start(
-        socket_path,
-        std::filesystem::perms::unknown,
+        unix_socket,
         []() {
             INFO() << "Listening for connections";
         }
     )) {
-        ASSERT_FALSE(std::filesystem::exists(socket_path));
+        ASSERT_FALSE(std::filesystem::exists(unix_socket.path));
         return;
     }
 
-    ASSERT_TRUE(std::filesystem::is_socket(socket_path));
+    ASSERT_TRUE(std::filesystem::is_socket(unix_socket.path));
 
     const auto code = server.stop();
     ASSERT_EQ(0, code);
@@ -44,14 +49,13 @@ TEST(ServerTest, Connection) {
     auto server = netcore::fork_server(increment);
 
     if (type::server == server.start(
-        socket_path,
-        std::filesystem::perms::unknown,
+        unix_socket,
         []() {
             INFO() << "Listening for connections";
         }
     )) { return; }
 
-    auto client = netcore::connect(socket_path.string());
+    auto client = netcore::connect(unix_socket.path.string());
     auto result = 0;
 
     client.write(&number, sizeof(number));

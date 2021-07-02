@@ -100,16 +100,7 @@ namespace netcore {
     }
 
     auto server::listen(
-        const fs::path& path,
-        const std::function<void()>& callback,
-        int backlog
-    ) -> void {
-        listen(path, fs::perms::unknown, callback, backlog);
-    }
-
-    auto server::listen(
-        const fs::path& path,
-        fs::perms perms,
+        const unix_socket& un,
         const std::function<void()>& callback,
         int backlog
     ) -> void {
@@ -117,14 +108,14 @@ namespace netcore {
 
         auto server_address = sockaddr_un();
         server_address.sun_family = AF_UNIX;
-        auto string = path.string();
+        auto string = un.path.string();
         string.copy(server_address.sun_path, string.size(), 0);
 
         // Remove the socket file if it exists.
         // It may be left over from a previous run where the program crashed.
         // If this file exists, the 'bind' operation will fail.
-        if (fs::remove(path)) {
-            WARN() << "Removed existing socket file: " << path;
+        if (fs::remove(un.path)) {
+            WARN() << "Removed existing socket file: " << un.path;
         }
 
         // Assign a socket file to the server socket.
@@ -136,16 +127,15 @@ namespace netcore {
         ) == -1) {
             throw ext::system_error("Failed to bind socket to path: " + string);
         }
-        DEBUG() << sock << " bound to path: " << path;
+        DEBUG() << sock << " bound to path: " << un.path;
 
-        // Set socket file permissions.
-        if (perms != fs::perms::unknown) fs::permissions(path, perms);
+        un.apply_permissions();
 
         // Handle connections.
         listen(backlog, callback);
 
-        if (fs::remove(path)) {
-            DEBUG() << "Removed socket file: " << path;
+        if (fs::remove(un.path)) {
+            DEBUG() << "Removed socket file: " << un.path;
         }
     }
 }

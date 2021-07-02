@@ -11,8 +11,7 @@ namespace netcore {
     {}
 
     auto fork_server::start(
-        const std::filesystem::path& path,
-        std::filesystem::perms perms,
+        const unix_socket& un,
         const std::function<void()>& callback,
         int backlog
     ) -> process_type {
@@ -39,7 +38,7 @@ namespace netcore {
 
         close(pipefd[0]);
 
-        m_server.listen(path, perms, [&]() {
+        m_server.listen(un, [&]() {
             callback();
 
             ready = true;
