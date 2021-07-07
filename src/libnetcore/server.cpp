@@ -115,7 +115,7 @@ namespace netcore {
         // It may be left over from a previous run where the program crashed.
         // If this file exists, the 'bind' operation will fail.
         if (fs::remove(un.path)) {
-            WARN() << "Removed existing socket file: " << un.path;
+            WARNING() << "Removed existing socket file: " << un.path;
         }
 
         // Assign a socket file to the server socket.
