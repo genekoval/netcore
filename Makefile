@@ -1,26 +1,19 @@
 project := netcore
-version := 0.1.0
 
-STD := gnu++2a
+STD := c++20
 
-library = lib$(project)
+library := lib$(project)
 
 install := $(library)
 targets := $(install)
 
-$(library).type = shared
-define $(library).libs
- ext++
- timber
-endef
+$(library).type := shared
+$(library).libs := ext++ timber
 
 test.deps = $(library)
-define test.libs
- $(project)
- gtest
- gtest_main
- timber
-endef
+test.libs := $(project) gtest gtest_main timber
+
+files = $(include) $(src) Makefile VERSION
 
 include mkbuild/base.mk
 
