@@ -16,9 +16,11 @@ namespace netcore {
             throw ext::system_error("epoll create failure");
         }
 
-        DEBUG()
-            << "event monitor (" << descriptor << ") created with "
-            << max_events << " max events";
+        TIMBER_DEBUG(
+            "event monitor ({}) created with {} max events",
+            descriptor,
+            max_events
+        );
     }
 
     auto event_monitor::add(int fd) -> void {

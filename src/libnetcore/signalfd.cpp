@@ -8,7 +8,7 @@
 
 namespace netcore {
     signalfd::signalfd(int descriptor) : descriptor(descriptor) {
-        DEBUG() << "signalfd (" << descriptor << ") created";
+        TIMBER_DEBUG("signalfd ({}) created", descriptor);
     }
 
     signalfd::operator int() const { return descriptor; }

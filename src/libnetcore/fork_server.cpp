@@ -32,7 +32,7 @@ namespace netcore {
 
             if (!ready) throw std::runtime_error("Failed to start server");
 
-            DEBUG() << "Started server with PID: " << pid;
+            TIMBER_DEBUG("Started server with PID: {}", pid);
             return process_type::client;
         }
 
@@ -55,7 +55,7 @@ namespace netcore {
     auto fork_server::stop(int signal) -> int {
         auto status = 0;
 
-        DEBUG() << "Sending signal (" << signal << ") to PID: " << pid;
+        TIMBER_DEBUG("Sending signal ({}) to PID: {}", signal, pid);
         if (kill(pid, signal) == -1) throw ext::system_error(
             "Failed to kill server process"
         );
@@ -68,7 +68,7 @@ namespace netcore {
 
         auto exit_code = WEXITSTATUS(status);
 
-        DEBUG() << "Server exited with code: " << exit_code;
+        TIMBER_DEBUG("Server exited with code: {}", exit_code);
         return exit_code;
     }
 }

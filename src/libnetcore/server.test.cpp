@@ -18,7 +18,7 @@ const auto unix_socket = netcore::unix_socket {
 const auto increment = [](auto&& socket) {
     auto number = std::int32_t();
     socket.read(&number, sizeof(number));
-    DEBUG() << "increment: received " << number;
+    TIMBER_DEBUG("increment: received {}", number);
 
     number++;
     socket.write(&number, sizeof(number));
@@ -30,7 +30,7 @@ TEST(ServerTest, StartStop) {
     if (type::server == server.start(
         unix_socket,
         []() {
-            INFO() << "Listening for connections";
+            TIMBER_INFO("Listening for connections");
         }
     )) {
         ASSERT_FALSE(std::filesystem::exists(unix_socket.path));
@@ -51,7 +51,7 @@ TEST(ServerTest, Connection) {
     if (type::server == server.start(
         unix_socket,
         []() {
-            INFO() << "Listening for connections";
+            TIMBER_INFO("Listening for connections");
         }
     )) { return; }
 

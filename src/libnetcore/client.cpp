@@ -16,15 +16,14 @@ namespace netcore {
             auto sock = socket(res->ai_family, res->ai_socktype);
 
             if (::connect(sock, res->ai_addr, res->ai_addrlen) != -1) {
-                DEBUG() << sock << " connected to: " << host << ":" << port;
+                TIMBER_DEBUG("{} connected to: {}:{}", sock, host, port);
                 return sock;
             }
         }
 
-        throw ext::system_error(
-            "failed to connect to: " +
-            std::string(host) + ":" + std::string(port)
-        );
+        throw ext::system_error(fmt::format(
+            "failed to connect to: {}:{}", host, port
+        ));
     }
 
     auto connect(std::string_view path) -> socket {
@@ -36,7 +35,7 @@ namespace netcore {
         auto sock = socket(AF_UNIX, SOCK_STREAM);
 
         if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) != -1) {
-            DEBUG() << sock << " connected to: " << path;
+            TIMBER_DEBUG("{} connected to: {}", sock, path);
             return sock;
         }
 

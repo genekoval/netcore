@@ -11,7 +11,7 @@ $(library).type := shared
 $(library).libs := ext++ timber
 
 test.deps = $(library)
-test.libs := $(project) gtest gtest_main timber
+test.libs := $(project) fmt gtest timber
 
 files = $(include) $(src) Makefile VERSION
 

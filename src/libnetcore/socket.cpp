@@ -11,7 +11,7 @@
 
 namespace netcore {
     socket::socket(int fd) : sockfd(fd) {
-        DEBUG() << *this << " created";
+        TIMBER_DEBUG("{} created", *this);
     }
 
     socket::socket(int domain, int type) : socket(::socket(domain, type, 0)) {
@@ -25,7 +25,7 @@ namespace netcore {
             throw ext::system_error("failed to shutdown further transmissions");
         }
 
-        DEBUG() << *this << " shutdown transmissions";
+        TIMBER_DEBUG("{} shutdown transmissions", *this);
     }
 
     auto socket::read(void* buffer, std::size_t len) const -> std::size_t {
@@ -36,7 +36,7 @@ namespace netcore {
             throw ext::system_error("failed to receive data");
         }
 
-        DEBUG() << *this << " recv " << bytes << " bytes";
+        TIMBER_DEBUG("{} recv {} bytes", *this, bytes);
 
         return bytes;
     }
@@ -57,9 +57,9 @@ namespace netcore {
 
             sent += bytes;
 
-            DEBUG()
-                << *this << " send " << bytes << " bytes (sendfile ["
-                << sent << "/" << count << "])";
+            TIMBER_DEBUG(
+                "{} send {} bytes (sendfile [{}/{}])", *this, bytes, sent, count
+            );
         }
     }
 
@@ -69,17 +69,12 @@ namespace netcore {
         auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
 
         if (bytes == -1) {
-            DEBUG() << *this << " failed to send data";
+            TIMBER_DEBUG("{} failed to send data", *this);
             throw ext::system_error("failed to send data");
         }
 
-        DEBUG() << *this << " send " << bytes << " bytes";
+        TIMBER_DEBUG("{} send {} bytes", *this, bytes);
 
         return bytes;
-    }
-
-    auto operator<<(std::ostream& os, const socket& sock) -> std::ostream& {
-        os << "socket (" << static_cast<int>(sock) << ")";
-        return os;
     }
 }

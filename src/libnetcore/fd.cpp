@@ -1,31 +1,40 @@
 #include <netcore/fd.h>
 
 #include <cstring>
-#include <ostream>
 #include <timber/timber>
 #include <unistd.h>
 #include <utility>
 
-namespace netcore {
-    constexpr auto invalid = -1;
-
-    auto operator<<(std::ostream& os, const fd* fd) -> std::ostream& {
-        os << "fd (" << static_cast<int>(*fd) << ")";
-        return os;
+template <>
+struct fmt::formatter<netcore::fd> {
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext& ctx) {
+        return ctx.begin();
     }
 
+    template <typename FormatContext>
+    auto format(const netcore::fd& fd, FormatContext& ctx) {
+        return format_to(ctx.out(), "fd ({})", static_cast<int>(fd));
+    }
+};
+
+namespace {
+    constexpr auto invalid = -1;
+}
+
+namespace netcore {
     fd::fd() : descriptor(invalid) {
-        TRACE() << "file descriptor default created";
+        TIMBER_TRACE("file descriptor default created");
     }
 
     fd::fd(int descriptor) : descriptor(descriptor) {
-        DEBUG() << this << " created";
+        TIMBER_DEBUG("{} created", *this);
     }
 
     fd::fd(fd&& other) noexcept :
         descriptor(std::exchange(other.descriptor, invalid))
     {
-        TRACE() << this << " move constructed";
+        TIMBER_TRACE("{} move constructed", *this);
     }
 
     fd::~fd() {
@@ -37,16 +46,16 @@ namespace netcore {
 
     auto fd::operator=(fd&& other) noexcept -> fd& {
         descriptor = std::exchange(other.descriptor, invalid);
-        TRACE() << this << " move assigned";
+        TIMBER_TRACE("{} move assigned", *this);
         return *this;
     }
 
     auto fd::close() noexcept -> void {
         if (::close(descriptor) == -1) {
-            ERROR() << this << " failed to close: " << std::strerror(errno);
+            TIMBER_ERROR("{} failed to close: {}", *this, std::strerror(errno));
         }
         else {
-            DEBUG() << this << " closed";
+            TIMBER_TRACE("{} closed", *this);
         }
 
         descriptor = invalid;

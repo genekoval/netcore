@@ -51,7 +51,7 @@ namespace netcore {
             throw ext::system_error("Socket listen failure");
         }
 
-        DEBUG() << sock << " listening for connections";
+        TIMBER_DEBUG("{} listening for connections", sock);
 
         // Leave room for:
         //      1. a full backlog of clients;
@@ -82,8 +82,11 @@ namespace netcore {
                     // the connection upon destruction.
                     auto s = socket(current);
 
-                    DEBUG() << s << " peer closed connection, "
-                        << "or shut down writing half of connection";
+                    TIMBER_DEBUG(
+                        "{} peer closed connection, "
+                        "or shut down writing half of connection",
+                        s
+                    );
 
                     return;
                 }
@@ -96,7 +99,7 @@ namespace netcore {
             });
         } while (!signal);
 
-        INFO() << "signal (" << signal << "): " << strsignal(signal);
+        TIMBER_INFO("signal ({}): {}", signal, strsignal(signal));
     }
 
     auto server::listen(
@@ -108,14 +111,14 @@ namespace netcore {
 
         auto server_address = sockaddr_un();
         server_address.sun_family = AF_UNIX;
-        auto string = un.path.string();
+        const auto string = un.path.string();
         string.copy(server_address.sun_path, string.size(), 0);
 
         // Remove the socket file if it exists.
         // It may be left over from a previous run where the program crashed.
         // If this file exists, the 'bind' operation will fail.
         if (fs::remove(un.path)) {
-            WARNING() << "Removed existing socket file: " << un.path;
+            TIMBER_WARNING("Removed existing socket file: {}", string);
         }
 
         // Assign a socket file to the server socket.
@@ -127,7 +130,7 @@ namespace netcore {
         ) == -1) {
             throw ext::system_error("Failed to bind socket to path: " + string);
         }
-        DEBUG() << sock << " bound to path: " << un.path;
+        TIMBER_DEBUG("{} bound to path: {}", sock, string);
 
         un.apply_permissions();
 
@@ -135,7 +138,7 @@ namespace netcore {
         listen(backlog, callback);
 
         if (fs::remove(un.path)) {
-            DEBUG() << "Removed socket file: " << un.path;
+            TIMBER_DEBUG("Removed socket file: {}", string);
         }
     }
 }

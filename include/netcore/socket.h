@@ -2,6 +2,7 @@
 
 #include <netcore/fd.h>
 
+#include <fmt/format.h>
 #include <sstream>
 #include <string>
 
@@ -25,6 +26,17 @@ namespace netcore {
 
         auto write(const void* data, std::size_t len) const -> std::size_t;
     };
-
-    auto operator<<(std::ostream& os, const socket& sock) -> std::ostream&;
 }
+
+template <>
+struct fmt::formatter<netcore::socket> {
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext& ctx) {
+        return ctx.begin();
+    }
+
+    template <typename FormatContext>
+    auto format(const netcore::socket& socket, FormatContext& ctx) {
+        return format_to(ctx.out(), "socket ({})", static_cast<int>(socket));
+    }
+};
