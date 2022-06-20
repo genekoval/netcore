@@ -13,6 +13,8 @@ $(library).libs := ext++ timber
 test.deps = $(library)
 test.libs := $(project) fmt gtest timber
 
+install.directories = $(include)/$(project)
+
 files = $(include) $(src) Makefile VERSION
 
 include mkbuild/base.mk
