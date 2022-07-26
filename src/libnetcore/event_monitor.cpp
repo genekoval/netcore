@@ -45,6 +45,7 @@ namespace netcore {
         );
 
         if (ready == -1) {
+            if (errno == EINTR) return;
             throw ext::system_error("epoll wait failure");
         }
 
