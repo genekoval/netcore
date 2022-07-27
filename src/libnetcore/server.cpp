@@ -114,13 +114,6 @@ namespace netcore {
         const auto string = un.path.string();
         string.copy(server_address.sun_path, string.size(), 0);
 
-        // Remove the socket file if it exists.
-        // It may be left over from a previous run where the program crashed.
-        // If this file exists, the 'bind' operation will fail.
-        if (fs::remove(un.path)) {
-            TIMBER_WARNING("Removed existing socket file: {}", string);
-        }
-
         // Assign a socket file to the server socket.
         // This creates the file.
         if (bind(
