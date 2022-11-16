@@ -1,41 +1,24 @@
 #include <netcore/fd.h>
 
 #include <cstring>
+#include <ext/except.h>
+#include <fcntl.h>
 #include <timber/timber>
 #include <unistd.h>
 #include <utility>
-
-template <>
-struct fmt::formatter<netcore::fd> {
-    template <typename ParseContext>
-    constexpr auto parse(ParseContext& ctx) {
-        return ctx.begin();
-    }
-
-    template <typename FormatContext>
-    auto format(const netcore::fd& fd, FormatContext& ctx) {
-        return format_to(ctx.out(), "fd ({})", static_cast<int>(fd));
-    }
-};
 
 namespace {
     constexpr auto invalid = -1;
 }
 
 namespace netcore {
-    fd::fd() : descriptor(invalid) {
-        TIMBER_TRACE("file descriptor default created");
-    }
+    fd::fd() : descriptor(invalid) {}
 
-    fd::fd(int descriptor) : descriptor(descriptor) {
-        TIMBER_DEBUG("{} created", *this);
-    }
+    fd::fd(int descriptor) : descriptor(descriptor) {}
 
     fd::fd(fd&& other) noexcept :
         descriptor(std::exchange(other.descriptor, invalid))
-    {
-        TIMBER_TRACE("{} move constructed", *this);
-    }
+    {}
 
     fd::~fd() {
         if (descriptor == invalid) return;
@@ -46,19 +29,38 @@ namespace netcore {
 
     auto fd::operator=(fd&& other) noexcept -> fd& {
         descriptor = std::exchange(other.descriptor, invalid);
-        TIMBER_TRACE("{} move assigned", *this);
         return *this;
     }
 
     auto fd::close() noexcept -> void {
         if (::close(descriptor) == -1) {
-            TIMBER_ERROR("{} failed to close: {}", *this, std::strerror(errno));
+            TIMBER_ERROR(
+                "failed to close file descriptor: {}",
+                std::strerror(errno)
+            );
         }
         else {
-            TIMBER_TRACE("{} closed", *this);
+            TIMBER_TRACE("fd ({}) closed", descriptor);
         }
 
         descriptor = invalid;
+    }
+
+    auto fd::flags() const -> int {
+        auto fl = fcntl(descriptor, F_GETFL, 0);
+        if (fl == -1) {
+            throw ext::system_error("failed to get socket flags");
+        }
+
+        return fl;
+    }
+
+    auto fd::flags(int flags) const -> void {
+        auto fl = this->flags() | flags;
+
+        if (fcntl(descriptor, F_SETFL, fl) == -1) {
+            throw ext::system_error("failed to set socket flags");
+        }
     }
 
     auto fd::valid() const -> bool { return descriptor != invalid; }

@@ -1,4 +1,4 @@
-#include <netcore/event_monitor.h>
+#include <netcore/except.hpp>
 #include <netcore/server.h>
 #include <netcore/signalfd.h>
 
@@ -7,115 +7,115 @@
 #include <ext/except.h>
 #include <sys/un.h>
 #include <timber/timber>
-#include <utility>
 
 namespace fs = std::filesystem;
 
 namespace netcore {
-    constexpr int stop_signals[] = {
-        SIGINT,
-        SIGTERM
-    };
-
-    server::server(const connection_handler on_connection) :
-        on_connection(on_connection)
+    server::server(connection_handler&& on_connection) :
+        on_connection(std::move(on_connection))
     {}
 
-    server::server(server&& other) noexcept :
-        sock(std::exchange(other.sock, socket()))
-    {}
-
-    auto server::accept() const -> int {
+    auto server::accept(socket& sock) const -> ext::task<int> {
         auto client_addr = sockaddr_storage();
         socklen_t addrlen = sizeof(client_addr);
 
-        auto client = ::accept(sock, (sockaddr*) &client_addr, &addrlen);
+        auto client = -1;
 
-        if (client == -1) {
-            throw ext::system_error("Failed to accpet client connection");
+        do {
+            client = ::accept4(
+                sock,
+                (sockaddr*) &client_addr,
+                &addrlen,
+                SOCK_NONBLOCK
+            );
+
+            if (client == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await sock.wait();
+                    if (detail::notifier::instance().shutting_down()) break;
+                }
+                else {
+                    throw ext::system_error(
+                        "failed to accept client connection"
+                    );
+                }
+            }
+        } while (client == -1);
+
+        co_return client;
+    }
+
+    auto server::connections() const noexcept -> unsigned int {
+        return connection_count;
+    }
+
+    auto server::handle_connection(int client) -> ext::detached_task {
+        ++connection_count;
+
+        TIMBER_DEBUG("client ({}) connected", client);
+
+        try {
+            co_await on_connection(socket(client, EPOLLIN));
+        }
+        catch (const std::exception& ex) {
+            TIMBER_ERROR("client connection closed: {}", ex.what());
+        }
+        catch (...) {
+            TIMBER_ERROR("client connection closed: unknown error");
         }
 
-        auto client_flags = fcntl(client, F_GETFL, 0);
-        if (client_flags == -1) {
-            throw ext::system_error("Failed to get client flags");
-        }
-
-        return client;
+        --connection_count;
+        if (connection_count == 0) close.emit();
     }
 
     auto server::listen(
-        int backlog,
-        const std::function<void()>& callback
-    ) const -> void {
+        socket& sock,
+        const listen_callback& callback,
+        int backlog
+    ) -> ext::task<> {
         if (::listen(sock, backlog) == -1) {
-            throw ext::system_error("Socket listen failure");
+            throw ext::system_error("socket listen failure");
         }
 
         TIMBER_DEBUG("{} listening for connections", sock);
-
-        // Leave room for:
-        //      1. a full backlog of clients;
-        //      2. the server socket;
-        //      3. the signal socket.
-        auto monitor = event_monitor(backlog + 2);
-
-        monitor.set(EPOLLIN); // Event types for server socket.
-        monitor.add(sock);
-
-        // Event types for client and signal sockets.
-        monitor.set(EPOLLIN | EPOLLRDHUP);
-
-        const auto sigfd = signalfd::create(std::span(stop_signals));
-        monitor.add(sigfd);
-
         callback();
 
-        auto signal = 0;
-
-        do {
-            monitor.wait([&](const epoll_event& event) {
-                auto current = event.data.fd;
-
-                if (event.events & EPOLLRDHUP) {
-                    // We need to call `close()` on this file descriptor.
-                    // Create a socket instance, which will close
-                    // the connection upon destruction.
-                    auto s = socket(current);
-
-                    TIMBER_DEBUG(
-                        "{} peer closed connection, "
-                        "or shut down writing half of connection",
-                        s
-                    );
-
-                    return;
-                }
-
-                if (current == static_cast<int>(sock)) monitor.add(accept());
-                else if (current == static_cast<int>(sigfd)) {
-                    signal = sigfd.signal();
-                }
-                else on_connection(current);
-            });
-        } while (!signal);
-
-        TIMBER_INFO("signal ({}): {}", signal, strsignal(signal));
+        while (true) {
+            try {
+                const auto client = co_await accept(sock);
+                if (client == -1) break;
+                handle_connection(client);
+            }
+            catch (const task_canceled&) {
+                break;
+            }
+            catch (const ext::system_error& ex) {
+                TIMBER_ERROR(ex.what());
+            }
+        }
     }
 
     auto server::listen(
-        const unix_socket& un,
-        const std::function<void()>& callback,
+        const unix_socket& unix_socket,
+        const listen_callback& callback,
         int backlog
-    ) -> void {
-        sock = socket(AF_UNIX, SOCK_STREAM);
+    ) -> ext::task<> {
+        co_await listen_priv(unix_socket, callback, backlog);
+        co_await wait_for_connections();
+    }
+
+    auto server::listen_priv(
+        const unix_socket& unix_socket,
+        const listen_callback& callback,
+        int backlog
+    ) -> ext::task<> {
+        auto sock = socket(AF_UNIX, SOCK_STREAM, EPOLLIN);
 
         auto server_address = sockaddr_un();
         server_address.sun_family = AF_UNIX;
-        const auto string = un.path.string();
+        const auto string = unix_socket.path.string();
         string.copy(server_address.sun_path, string.size(), 0);
 
-        // Assign a socket file to the server socket.
-        // This creates the file.
         if (bind(
             sock,
             (sockaddr*) &server_address,
@@ -123,15 +123,27 @@ namespace netcore {
         ) == -1) {
             throw ext::system_error("Failed to bind socket to path: " + string);
         }
+
         TIMBER_DEBUG("{} bound to path: {}", sock, string);
 
-        un.apply_permissions();
+        unix_socket.apply_permissions();
 
-        // Handle connections.
-        listen(backlog, callback);
+        co_await listen(sock, callback, backlog);
 
-        if (fs::remove(un.path)) {
+        if (fs::remove(unix_socket.path)) {
             TIMBER_DEBUG("Removed socket file: {}", string);
         }
+    }
+
+    auto server::wait_for_connections() -> ext::task<> {
+        if (connection_count == 0) co_return;
+
+        TIMBER_INFO(
+            "Waiting for {:L} connection{}",
+            connection_count,
+            connection_count == 1 ? "" : "s"
+        );
+
+        co_await close.listen();
     }
 }

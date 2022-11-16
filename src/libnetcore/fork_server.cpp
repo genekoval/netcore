@@ -1,3 +1,4 @@
+#include <netcore/async.hpp>
 #include <netcore/server.h>
 
 #include <ext/except.h>
@@ -6,13 +7,13 @@
 #include <unistd.h>
 
 namespace netcore {
-    fork_server::fork_server(const connection_handler on_connection) :
-        m_server(on_connection)
+    fork_server::fork_server(connection_handler&& on_connection) :
+        on_connection(std::move(on_connection))
     {}
 
     auto fork_server::start(
-        const unix_socket& un,
-        const std::function<void()>& callback,
+        const unix_socket& unix_socket,
+        std::function<void()>&& callback,
         int backlog
     ) -> process_type {
         int pipefd[2];
@@ -38,12 +39,24 @@ namespace netcore {
 
         close(pipefd[0]);
 
-        m_server.listen(un, [&]() {
+        auto server = netcore::server(std::move(on_connection));
+        const auto task = [
+            &server,
+            &unix_socket
+        ](auto&& callback) -> ext::task<> {
+            co_await server.listen(unix_socket, std::move(callback));
+        };
+
+        netcore::async(task([
+            &ready,
+            &pipefd,
+            callback = std::move(callback)
+        ]() {
             callback();
 
             ready = true;
             write(pipefd[1], &ready, sizeof(ready));
-        });
+        }));
 
         return process_type::server;
     }

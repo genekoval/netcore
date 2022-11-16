@@ -10,50 +10,86 @@
 #include <utility>
 
 namespace netcore {
-    socket::socket(int fd) : sockfd(fd) {
-        TIMBER_DEBUG("{} created", *this);
+    socket::socket(int fd, uint32_t events) :
+        descriptor(fd),
+        notification(fd, events)
+    {
+        TIMBER_TRACE("{} created", *this);
     }
 
-    socket::socket(int domain, int type) : socket(::socket(domain, type, 0)) {
-        if (!sockfd.valid()) throw ext::system_error("Failed to create socket");
+    socket::socket(int domain, int type, uint32_t events) :
+        socket(::socket(domain, type | SOCK_NONBLOCK, 0), events)
+    {
+        if (!descriptor.valid()) {
+            throw ext::system_error("failed to create socket");
+        }
     }
 
-    socket::operator int() const { return sockfd; }
+    socket::operator int() const { return descriptor; }
+
+    auto socket::deregister() -> void {
+        notification.deregister();
+    }
 
     auto socket::end() const -> void {
-        if (shutdown(sockfd, SHUT_WR) == -1) {
+        if (::shutdown(descriptor, SHUT_WR) == -1) {
             throw ext::system_error("failed to shutdown further transmissions");
         }
 
         TIMBER_DEBUG("{} shutdown transmissions", *this);
     }
 
-    auto socket::read(void* buffer, std::size_t len) const -> std::size_t {
-        auto bytes = ::recv(sockfd, buffer, len, 0);
+    auto socket::read(
+        void* buffer,
+        std::size_t len
+    ) -> ext::task<std::size_t> {
+        auto bytes = -1;
 
-        if (bytes == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
-            throw ext::system_error("failed to receive data");
-        }
+        do {
+            bytes = ::recv(descriptor, buffer, len, 0);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await wait(EPOLLIN);
+                    continue;
+                }
+
+                throw ext::system_error("failed to receive data");
+            }
+        } while (bytes == -1);
 
         TIMBER_DEBUG("{} recv {} bytes", *this, bytes);
 
-        return bytes;
+        co_return bytes;
     }
 
-    auto socket::sendfile(const fd& descriptor, std::size_t count) const -> void {
+    auto socket::register_scoped() -> register_guard {
+        return notification.register_scoped();
+    }
+
+    auto socket::sendfile(
+        const fd& descriptor,
+        std::size_t count
+    ) -> ext::task<> {
         auto sent = std::size_t();
         auto offset = off_t();
 
         while (sent < count) {
             const auto bytes = ::sendfile(
-                sockfd,
+                this->descriptor,
                 descriptor,
                 &offset,
                 count - sent
             );
 
-            if (bytes == -1) throw ext::system_error("sendfile failure");
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await wait(EPOLLOUT);
+                    continue;
+                }
+
+                throw ext::system_error("sendfile failure");
+            }
 
             sent += bytes;
 
@@ -63,18 +99,34 @@ namespace netcore {
         }
     }
 
-    auto socket::valid() const -> bool { return sockfd.valid(); }
+    auto socket::valid() const -> bool { return descriptor.valid(); }
 
-    auto socket::write(const void* data, std::size_t len) const -> std::size_t {
-        auto bytes = ::send(sockfd, data, len, MSG_NOSIGNAL);
+    auto socket::wait(uint32_t event) -> ext::task<> {
+        co_await notification.wait(event);
+    }
 
-        if (bytes == -1) {
-            TIMBER_DEBUG("{} failed to send data", *this);
-            throw ext::system_error("failed to send data");
-        }
+    auto socket::write(
+        const void* data,
+        std::size_t len
+    ) -> ext::task<std::size_t> {
+        auto bytes = -1;
+
+        do {
+            bytes = ::send(descriptor, data, len, MSG_NOSIGNAL);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await wait(EPOLLOUT);
+                    continue;
+                }
+
+                TIMBER_DEBUG("{} failed to send data", *this);
+                throw ext::system_error("failed to send data");
+            }
+        } while (bytes == -1);
 
         TIMBER_DEBUG("{} send {} bytes", *this, bytes);
 
-        return bytes;
+        co_return bytes;
     }
 }

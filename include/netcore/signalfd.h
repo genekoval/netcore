@@ -1,6 +1,6 @@
 #pragma once
 
-#include <netcore/fd.h>
+#include <netcore/socket.h>
 
 #include <cstdint>
 #include <span>
@@ -8,13 +8,16 @@
 namespace netcore {
     class signalfd {
         const fd descriptor;
+        detail::notification notification;
 
         signalfd(int descriptor);
+
+        auto read(void* buffer, std::size_t len) -> ext::task<void>;
     public:
         static auto create(std::span<const int> signals) -> signalfd;
 
         operator int() const;
 
-        auto signal() const -> std::uint32_t;
+        auto wait_for_signal() noexcept -> ext::task<int>;
     };
 }

@@ -1,5 +1,4 @@
-#include <netcore/client.h>
-#include <netcore/server.h>
+#include <netcore/netcore>
 
 #include <gtest/gtest.h>
 #include <timber/timber>
@@ -15,13 +14,14 @@ const auto unix_socket = netcore::unix_socket {
     .mode = fs::perms::owner_read | fs::perms::owner_write
 };
 
-const auto increment = [](auto&& socket) {
+const auto increment = [](auto&& socket) -> ext::task<> {
     auto number = std::int32_t();
-    socket.read(&number, sizeof(number));
+    co_await socket.read(&number, sizeof(number));
+
     TIMBER_DEBUG("increment: received {}", number);
 
     number++;
-    socket.write(&number, sizeof(number));
+    co_await socket.write(&number, sizeof(number));
 };
 
 TEST(ServerTest, StartStop) {
@@ -32,10 +32,7 @@ TEST(ServerTest, StartStop) {
         []() {
             TIMBER_INFO("Listening for connections");
         }
-    )) {
-        ASSERT_FALSE(std::filesystem::exists(unix_socket.path));
-        return;
-    }
+    )) { std::exit(0); }
 
     ASSERT_TRUE(std::filesystem::is_socket(unix_socket.path));
 
@@ -53,15 +50,22 @@ TEST(ServerTest, Connection) {
         []() {
             TIMBER_INFO("Listening for connections");
         }
-    )) { return; }
+    )) { std::exit(0); }
 
-    auto client = netcore::connect(unix_socket.path.string());
-    auto result = 0;
+    const auto task = [number]() -> ext::task<> {
+        auto client = co_await netcore::connect(
+            unix_socket.path.string()
+        );
 
-    client.write(&number, sizeof(number));
-    client.read(&result, sizeof(result));
+        co_await client.write(&number, sizeof(number));
 
-    ASSERT_EQ(number + 1, result);
+        auto result = decltype(number)(0);
+        co_await client.read(&result, sizeof(result));
+
+        EXPECT_EQ(number + 1, result);
+    };
+
+    netcore::async(task());
 
     server.stop();
 }

@@ -1,52 +1,67 @@
 #pragma once
 
-#include <netcore/unix_socket.h>
+#include <netcore/event.hpp>
 #include <netcore/socket.h>
+#include <netcore/unix_socket.h>
 
 #include <filesystem>
 #include <functional>
 #include <sys/socket.h>
 
 namespace netcore {
-    using connection_handler = std::function<void(socket&&)>;
+    using connection_handler = std::function<ext::task<>(socket&&)>;
+    using listen_callback = std::function<void()>;
 
     class server {
-        const connection_handler on_connection;
-        socket sock;
+        event close;
+        unsigned int connection_count = 0;
+        connection_handler on_connection;
 
-        auto accept() const -> int;
+        auto accept(socket& sock) const -> ext::task<int>;
+
+        auto handle_connection(int client) -> ext::detached_task;
+
         auto listen(
-            int backlog,
-            const std::function<void()>& callback
-        ) const -> void;
+            socket& sock,
+            const listen_callback& callback,
+            int backlog
+        ) -> ext::task<>;
+
+        auto listen_priv(
+            const unix_socket& unix_socket,
+            const listen_callback& callback,
+            int backlog
+        ) -> ext::task<>;
+
+        auto wait_for_connections() -> ext::task<>;
     public:
-        server(const connection_handler on_connection);
-        server(const server&) = delete;
-        server(server&& other) noexcept;
+        server(connection_handler&& on_connection);
 
-        auto operator=(const server&) -> server& = delete;
+        server(server&& other) = delete;
+
+        auto connections() const noexcept -> unsigned int;
 
         auto listen(
-            const unix_socket& un,
-            const std::function<void()>& callback,
+            const unix_socket& unix_socket,
+            const listen_callback& callback,
             int backlog = SOMAXCONN
-        ) -> void;
+        ) -> ext::task<>;
     };
 
     class fork_server {
         pid_t pid;
-        server m_server;
+        connection_handler on_connection;
     public:
         enum class process_type {
             client,
             server
         };
 
-        fork_server(const connection_handler on_connection);
+        fork_server(connection_handler&& on_connection);
 
         auto start(
-            const unix_socket& un,
-            const std::function<void()>& callback,
+            const unix_socket& unix_socket,
+            std::function<void()>&& callback,
             int backlog = SOMAXCONN
         ) -> process_type;
 

@@ -9,36 +9,54 @@
 #include <timber/timber>
 
 namespace netcore {
-    auto connect(std::string_view host, std::string_view port) -> socket {
+    auto connect(
+        std::string_view host,
+        std::string_view port
+    ) -> ext::task<socket> {
         auto addr = address(host, port);
 
         for (auto* res = addr.data(); res != nullptr; res = res->ai_next) {
-            auto sock = socket(res->ai_family, res->ai_socktype);
+            auto sock = socket(res->ai_family, res->ai_socktype, EPOLLOUT);
 
-            if (::connect(sock, res->ai_addr, res->ai_addrlen) != -1) {
-                TIMBER_DEBUG("{} connected to: {}:{}", sock, host, port);
-                return sock;
+            while (true) {
+                if (::connect(sock, res->ai_addr, res->ai_addrlen) == 0) {
+                    TIMBER_DEBUG("{} connected to {}:{}", sock, host, port);
+                    co_return sock;
+                }
+
+                if (errno != EINPROGRESS) break;
+
+                co_await sock.wait();
             }
         }
 
         throw ext::system_error(fmt::format(
-            "failed to connect to: {}:{}", host, port
+            "Failed to connect to ({}:{})", host, port
         ));
     }
 
-    auto connect(std::string_view path) -> socket {
+    auto connect(std::string_view path) -> ext::task<socket> {
         auto addr = sockaddr_un();
         std::memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         path.copy(addr.sun_path, path.size());
 
-        auto sock = socket(AF_UNIX, SOCK_STREAM);
+        auto sock = socket(AF_UNIX, SOCK_STREAM, EPOLLOUT);
 
-        if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) != -1) {
-            TIMBER_DEBUG("{} connected to: {}", sock, path);
-            return sock;
+        while (true) {
+            if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) == 0) {
+                TIMBER_DEBUG("{} connected to \"{}\"", sock, path);
+                co_return sock;
+            }
+
+            if (errno != EINPROGRESS) break;
+
+            co_await sock.wait();
         }
 
-        throw ext::system_error("failed to connect to: " + std::string(path));
+        throw ext::system_error(fmt::format(
+            "Failed to connect to \"{}\"",
+            path
+        ));
     }
 }
