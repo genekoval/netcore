@@ -70,6 +70,11 @@ namespace netcore::detail {
         tail = &other;
     }
 
+    auto notification::cancel() -> void {
+        awaiters.cancel();
+        notify();
+    }
+
     auto notification::register_scoped() -> register_guard {
         register_unscoped();
         return register_guard(this);
@@ -89,6 +94,19 @@ namespace netcore::detail {
 
     auto notification::empty() const noexcept -> bool {
         return head == this && tail == this;
+    }
+
+    auto notification::error(std::exception_ptr ex) noexcept -> void {
+        awaiters.error(ex);
+        notify();
+    }
+
+    auto notification::latest_events() const noexcept -> uint32_t {
+        return events;
+    }
+
+    auto notification::notify() -> void {
+        notifier::instance().enqueue(awaiters);
     }
 
     auto notification::one_or_empty() const noexcept -> bool {
@@ -134,18 +152,23 @@ namespace netcore::detail {
         notifier::instance().update(*this);
     }
 
-    auto notification::wait(uint32_t events) -> ext::task<> {
+    auto notification::wait(
+        uint32_t events,
+        void* state
+    ) -> ext::task<awaiter*> {
         set_events(events);
 
         TIMBER_TRACE("fd ({}) suspended", fd);
 
         try {
-            co_await awaitable(awaiters);
+            co_return co_await awaitable(awaiters, state);
             TIMBER_TRACE("fd ({}) resumed", fd);
         }
         catch (const task_canceled&) {
             TIMBER_DEBUG("fd ({}) canceled", fd);
             throw;
         }
+
+        co_return nullptr;
     }
 }

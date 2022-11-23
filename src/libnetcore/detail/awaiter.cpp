@@ -5,6 +5,19 @@
 #include <utility>
 
 namespace netcore::detail {
+    auto awaiter::cancel() noexcept -> void {
+        error(std::make_exception_ptr(task_canceled()));
+    }
+
+    auto awaiter::error(std::exception_ptr ex) noexcept -> void {
+        auto* current = this;
+
+        do {
+            current->exception = ex;
+            current = current->next;
+        } while (current);
+    }
+
     awaiter_queue::awaiter_queue(awaiter_queue&& other) :
         head(std::exchange(other.head, nullptr)),
         tail(std::exchange(other.tail, nullptr))
@@ -17,6 +30,10 @@ namespace netcore::detail {
         tail = std::exchange(other.tail, nullptr);
 
         return *this;
+    }
+
+    auto awaiter_queue::cancel() noexcept -> void {
+        if (head) head->cancel();
     }
 
     auto awaiter_queue::empty() const noexcept -> bool {
@@ -41,6 +58,10 @@ namespace netcore::detail {
         other.tail = nullptr;
     }
 
+    auto awaiter_queue::error(std::exception_ptr ex) noexcept -> void {
+        if (head) head->error(ex);
+    }
+
     auto awaiter_queue::resume() -> void {
         // Make a local copy of the awaiter list, and create a new list
         // as resumed coroutines could add more awaiters.
@@ -57,30 +78,29 @@ namespace netcore::detail {
         }
     }
 
-    awaitable::awaitable(awaiter_queue& awaiters) :
+    awaitable::awaitable(awaiter_queue& awaiters, void* state) :
         awaiters(awaiters)
-    {}
+    {
+        a.state = state;
+    }
 
     auto awaitable::await_ready() const noexcept -> bool {
         return false;
     }
 
-    auto awaitable::check_runtime_status() const -> void {
+    auto awaitable::await_suspend(std::coroutine_handle<> coroutine) -> void {
         const auto status = notifier::instance().status();
 
         if (status == notifier_status::force_shutdown) {
             throw task_canceled();
         }
-    }
-
-    auto awaitable::await_suspend(std::coroutine_handle<> coroutine) -> void {
-        check_runtime_status();
 
         a.coroutine = coroutine;
         awaiters.enqueue(a);
     }
 
-    auto awaitable::await_resume() -> void {
-        check_runtime_status();
+    auto awaitable::await_resume() -> awaiter* {
+        if (a.exception) std::rethrow_exception(a.exception);
+        return a.next;
     }
 }

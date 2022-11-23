@@ -28,7 +28,7 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await notification.wait();
+                    co_await notification.wait(0, nullptr);
                     continue;
                 }
 

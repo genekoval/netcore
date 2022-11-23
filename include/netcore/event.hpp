@@ -9,6 +9,8 @@ namespace netcore {
     class event {
         detail::awaiter_queue listeners;
     public:
+        auto cancel() -> void;
+
         auto emit() -> void;
 
         auto listen() -> ext::task<>;

@@ -102,7 +102,7 @@ namespace netcore {
     auto socket::valid() const -> bool { return descriptor.valid(); }
 
     auto socket::wait(uint32_t event) -> ext::task<> {
-        co_await notification.wait(event);
+        co_await notification.wait(event, nullptr);
     }
 
     auto socket::write(

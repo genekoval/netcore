@@ -46,7 +46,7 @@ namespace netcore {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await notification.wait();
+                    co_await notification.wait(0, nullptr);
                     continue;
                 }
 

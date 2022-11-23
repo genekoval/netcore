@@ -87,6 +87,20 @@ namespace netcore::detail {
         TIMBER_TRACE("{} added entry ({})", *this, notification.fd);
     }
 
+    auto notifier::cancel() -> void {
+        TIMBER_TRACE("{} canceling tasks", *this);
+
+        auto* current = &notifications;
+
+        do {
+            current->notify();
+            current = current->head;
+        } while (current != &notifications);
+
+        pending.cancel();
+        pending.resume();
+    }
+
     auto notifier::empty() const noexcept -> bool {
         return notifications.empty() && pending.empty();
     }
@@ -150,6 +164,8 @@ namespace netcore::detail {
             else if (stat == notifier_status::graceful_shutdown) {
                 timeout = graceful_timeout.count();
             }
+
+            TIMBER_TRACE("{} waiting for events", *this);
 
             const auto wait_started = clock::now();
 
@@ -237,7 +253,7 @@ namespace netcore::detail {
     auto notifier::stop() noexcept -> void {
         TIMBER_TRACE("{} received stop request", *this);
         stat = notifier_status::force_shutdown;
-        resume_all();
+        cancel();
     }
 
     auto notifier::update(notification& notification) -> void {

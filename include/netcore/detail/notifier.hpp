@@ -71,11 +71,25 @@ namespace netcore::detail {
 
         auto operator=(notification&&) -> notification&;
 
-        auto register_scoped() -> register_guard;
+        auto cancel() -> void;
 
         auto deregister() -> void;
 
-        auto wait(uint32_t events = 0) -> ext::task<>;
+        auto error(std::exception_ptr ex) noexcept -> void;
+
+        auto latest_events() const noexcept -> uint32_t;
+
+        auto notify() -> void;
+
+        template <typename T>
+        auto notify(const T state) -> void {
+            awaiters.assign(state);
+            notify();
+        }
+
+        auto register_scoped() -> register_guard;
+
+        auto wait(uint32_t events, void* state) -> ext::task<awaiter*>;
     };
 
     struct notifier_options {
@@ -98,6 +112,8 @@ namespace netcore::detail {
         notification notifications;
         awaiter_queue pending;
         notifier_status stat = notifier_status::stopped;
+
+        auto cancel() -> void;
 
         auto empty() const noexcept -> bool;
 
