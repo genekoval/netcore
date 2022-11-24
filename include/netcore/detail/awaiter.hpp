@@ -11,7 +11,7 @@ namespace netcore::detail {
         std::exception_ptr exception;
 
         template <typename T>
-        auto assign(const T state) const noexcept -> void {
+        auto assign(const T& state) const noexcept -> void {
             auto* current = this;
 
             do {
@@ -42,7 +42,7 @@ namespace netcore::detail {
         auto operator=(awaiter_queue&& other) noexcept -> awaiter_queue&;
 
         template <typename T>
-        auto assign(const T state) const noexcept -> void {
+        auto assign(const T& state) const noexcept -> void {
             if (head) head->assign(state);
         }
 

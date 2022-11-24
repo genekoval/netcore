@@ -40,7 +40,7 @@ TEST(Timer, Disarm) {
         const auto task = [](
             netcore::timer& timer,
             bool& canceled,
-            netcore::event& event
+            netcore::event<>& event
         ) -> ext::detached_task {
             try {
                 co_await timer.wait();

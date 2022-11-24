@@ -13,7 +13,7 @@ namespace netcore {
     using listen_callback = std::function<void()>;
 
     class server {
-        event close;
+        event<> close;
         unsigned int connection_count = 0;
         connection_handler on_connection;
 

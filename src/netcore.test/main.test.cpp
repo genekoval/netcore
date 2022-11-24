@@ -19,6 +19,8 @@ namespace {
         log_file.print(" {:9} ", log.log_level);
         log_file.print("[{}] ", log.thread_name);
         log_file.print("{}\n", log.message);
+
+        log_file.flush();
     }
 }
 
