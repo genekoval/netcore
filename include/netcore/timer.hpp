@@ -30,8 +30,6 @@ namespace netcore {
 
         timer() = default;
 
-        auto armed() const -> bool;
-
         auto disarm() -> void;
 
         auto set(

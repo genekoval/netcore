@@ -35,13 +35,6 @@ namespace netcore {
         TIMBER_TRACE("timer ({}) created", descriptor);
     }
 
-    auto timer::armed() const -> bool {
-        const auto info = get_time();
-        const auto& value = info.it_value;
-
-        return value.tv_sec != 0 || value.tv_nsec != 0;
-    }
-
     auto timer::disarm() -> void {
         set_time(0, 0);
         notification.cancel();
@@ -82,8 +75,6 @@ namespace netcore {
     }
 
     auto timer::wait() -> ext::task<std::uint64_t> {
-        if (!descriptor || !armed()) co_return 0;
-
         std::uint64_t expirations = 0;
         detail::awaiter* awaiters = nullptr;
 
