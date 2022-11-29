@@ -1,7 +1,30 @@
 #include <netcore/timer.hpp>
 
 #include <ext/except.h>
+#include <sys/timerfd.h>
 #include <timber/timber>
+
+using namespace std::chrono_literals;
+
+using std::chrono::floor;
+using std::chrono::nanoseconds;
+using std::chrono::seconds;
+
+namespace {
+    auto from_nsec(nanoseconds ns) -> timespec {
+        const auto s = floor<seconds>(ns);
+        const auto remainder = ns - s;
+
+        return {
+            .tv_sec = s.count(),
+            .tv_nsec = remainder.count()
+        };
+    }
+
+    auto to_nsec(const timespec& spec) -> nanoseconds {
+        return seconds(spec.tv_sec) + nanoseconds(spec.tv_nsec);
+    }
+}
 
 namespace netcore {
     auto timer::realtime() -> timer {
@@ -32,46 +55,54 @@ namespace netcore {
             throw ext::system_error("failed to create timer");
         }
 
-        TIMBER_TRACE("timer ({}) created", descriptor);
+        TIMBER_TRACE("{} created", *this);
     }
 
     auto timer::disarm() -> void {
-        set_time(0, 0);
+        set(time {
+            .value = nanoseconds::zero(),
+            .interval = nanoseconds::zero()
+        });
+
         notification.cancel();
 
-        TIMBER_TRACE("timer ({}) disarmed", descriptor);
+        TIMBER_TRACE("{} disarmed", *this);
     }
 
-    auto timer::get_time() const -> itimerspec {
+    auto timer::get() const -> time {
         auto spec = itimerspec();
-        timerfd_gettime(descriptor, &spec);
-        return spec;
+
+        if (timerfd_gettime(descriptor, &spec) == -1) {
+            throw ext::system_error("failed to read time");
+        }
+
+        return {
+            .value = to_nsec(spec.it_value),
+            .interval = to_nsec(spec.it_interval)
+        };
     }
 
-    auto timer::set(nanoseconds nsec, nanoseconds interval) -> void {
-        TIMBER_TRACE(
-            "timer ({}) set for {}ns ({}ns interval)",
-            descriptor,
-            nsec.count(),
-            interval.count()
-        );
-
-        set_time(nsec.count(), interval.count());
+    auto timer::set(nanoseconds value) const -> void {
+        set(time { .value = value });
     }
 
-    auto timer::set_time(long value, long interval) const -> void {
-        auto info = itimerspec {
-            .it_interval = {
-                .tv_sec = 0,
-                .tv_nsec = interval
-            },
-            .it_value = {
-                .tv_sec = 0,
-                .tv_nsec = value
-            }
+    auto timer::set(const time& t) const -> void {
+        const auto spec = itimerspec {
+            .it_interval = from_nsec(t.interval),
+            .it_value = from_nsec(t.value)
         };
 
-        timerfd_settime(descriptor, 0, &info, nullptr);
+        if (timerfd_settime(descriptor, 0, &spec, nullptr) == -1) {
+            throw ext::system_error("failed to set timer");
+        }
+
+        TIMBER_TRACE(
+            "{} set for {:L}ns{}",
+            *this,
+            t.value.count(),
+            t.interval == nanoseconds::zero() ? "" :
+                fmt::format("; {:L}ns interval", t.interval.count())
+        );
     }
 
     auto timer::wait() -> ext::task<std::uint64_t> {
@@ -97,7 +128,7 @@ namespace netcore {
             if (awaiters) awaiters->assign(expirations);
         } while (retval != sizeof(expirations));
 
-        TIMBER_TRACE("timer ({}) expirations: {}", descriptor, expirations);
+        TIMBER_TRACE("{} expirations: {}", *this, expirations);
         co_return expirations;
     }
 }

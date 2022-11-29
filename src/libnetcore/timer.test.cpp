@@ -14,14 +14,10 @@ namespace {
     auto now() {
         return std::chrono::steady_clock::now();
     }
-}
 
-TEST(Timer, Wait) {
-    netcore::async([]() -> ext::task<> {
-        constexpr auto wait = 200ms;
-
+    auto wait(milliseconds time) -> ext::task<> {
         auto timer = netcore::timer::monotonic();
-        timer.set(wait);
+        timer.set(time);
 
         const auto start = now();
         co_await timer.wait();
@@ -29,13 +25,25 @@ TEST(Timer, Wait) {
 
         const auto elapsed = duration_cast<milliseconds>(end - start);
 
-        EXPECT_GE(elapsed.count(), wait.count());
+        EXPECT_GE(elapsed, time);
+    }
+}
+
+TEST(Timer, WaitUnderSecond) {
+    netcore::async([]() -> ext::task<> {
+        co_await wait(100ms);
+    }());
+}
+
+TEST(Timer, WaitSecond) {
+    netcore::async([]() -> ext::task<> {
+        co_await wait(1s);
     }());
 }
 
 TEST(Timer, Disarm) {
     netcore::async([]() -> ext::task<> {
-        constexpr auto wait = 200ms;
+        constexpr auto time = 200ms;
 
         const auto task = [](
             netcore::timer& timer,
@@ -55,7 +63,7 @@ TEST(Timer, Disarm) {
         auto event = netcore::event();
         auto canceled = false;
         auto timer = netcore::timer::monotonic();
-        timer.set(wait);
+        timer.set(time);
 
         task(timer, canceled, event);
         timer.disarm();
@@ -66,7 +74,7 @@ TEST(Timer, Disarm) {
 
         const auto elapsed = duration_cast<milliseconds>(end - start);
 
-        EXPECT_LT(elapsed.count(), wait.count());
+        EXPECT_LT(elapsed, time);
         EXPECT_TRUE(canceled);
     }());
 }
