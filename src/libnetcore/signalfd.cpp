@@ -3,6 +3,7 @@
 
 #include <ext/except.h>
 #include <signal.h>
+#include <sys/epoll.h>
 #include <sys/signalfd.h>
 #include <timber/timber>
 #include <unistd.h>
@@ -10,7 +11,7 @@
 namespace netcore {
     signalfd::signalfd(int descriptor) :
         descriptor(descriptor),
-        notification(this->descriptor, EPOLLIN)
+        event(this->descriptor, EPOLLIN)
     {
         TIMBER_TRACE("signalfd ({}) created", descriptor);
     }
@@ -46,7 +47,7 @@ namespace netcore {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await notification.wait(0, nullptr);
+                    co_await event.wait(0, nullptr);
                     continue;
                 }
 

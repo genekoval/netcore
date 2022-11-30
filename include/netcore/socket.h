@@ -1,6 +1,7 @@
 #pragma once
 
-#include <netcore/detail/notifier.hpp>
+#include "fd.h"
+#include "system_event.hpp"
 
 #include <ext/coroutine>
 #include <fmt/format.h>
@@ -10,7 +11,7 @@
 namespace netcore {
     class socket {
         fd descriptor;
-        detail::notification notification;
+        system_event event;
     public:
         socket() = default;
         socket(int fd, uint32_t events);

@@ -1,5 +1,5 @@
-#include "netcore/except.hpp"
-#include <netcore/detail/notifier.hpp>
+#include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 
 #include <timber/timber>
 
@@ -8,17 +8,13 @@ namespace {
 }
 
 namespace netcore {
-    register_guard::register_guard(detail::notification* notif) :
-        notif(notif)
-    {}
+    register_guard::register_guard(system_event& notif) : notif(notif) {}
 
     register_guard::~register_guard() {
-        notif->deregister();
+        notif.deregister();
     }
-}
 
-namespace netcore::detail {
-    notification::notification(
+    system_event::system_event(
         int fd,
         uint32_t events
     ) :
@@ -28,13 +24,13 @@ namespace netcore::detail {
         register_unscoped();
     }
 
-    notification::notification(notification&& other) :
+    system_event::system_event(system_event&& other) :
         fd(std::exchange(other.fd, -1)),
         events(std::exchange(other.events, 0)),
         head(std::exchange(other.head, &other)),
         tail(std::exchange(other.tail, &other)),
         awaiters(std::exchange(other.awaiters, {})),
-        last_notifier(std::exchange(other.last_notifier, nullptr))
+        last_runtime(std::exchange(other.last_runtime, nullptr))
     {
         head->tail = this;
         tail->head = this;
@@ -42,17 +38,17 @@ namespace netcore::detail {
         update();
     }
 
-    notification::~notification() {
+    system_event::~system_event() {
         unlink();
     }
 
-    auto notification::operator=(notification&& other) -> notification& {
+    auto system_event::operator=(system_event&& other) -> system_event& {
         fd = std::exchange(other.fd, -1);
         events = std::exchange(other.events, 0);
         head = std::exchange(other.head, &other);
         tail = std::exchange(other.tail, &other);
         awaiters = std::exchange(other.awaiters, {});
-        last_notifier = std::exchange(other.last_notifier, nullptr);
+        last_runtime = std::exchange(other.last_runtime, nullptr);
 
         head->tail = this;
         tail->head = this;
@@ -62,7 +58,7 @@ namespace netcore::detail {
         return *this;
     }
 
-    auto notification::append(notification& other) noexcept -> void {
+    auto system_event::append(system_event& other) noexcept -> void {
         other.head = this;
         other.tail = tail;
 
@@ -70,54 +66,54 @@ namespace netcore::detail {
         tail = &other;
     }
 
-    auto notification::cancel() -> void {
+    auto system_event::cancel() -> void {
         awaiters.cancel();
         notify();
     }
 
-    auto notification::register_scoped() -> register_guard {
+    auto system_event::register_scoped() -> register_guard {
         register_unscoped();
-        return register_guard(this);
+        return register_guard(*this);
     }
 
-    auto notification::register_unscoped() -> void {
-        auto* const instance = &notifier::instance();
-        instance->add(*this);
-        last_notifier = instance;
+    auto system_event::register_unscoped() -> void {
+        auto* const current = &runtime::current();
+        current->add(*this);
+        last_runtime = current;
     }
 
-    auto notification::deregister() -> void {
+    auto system_event::deregister() -> void {
         unlink();
-        notifier::instance().remove(*this);
-        last_notifier = nullptr;
+        runtime::current().remove(*this);
+        last_runtime = nullptr;
     }
 
-    auto notification::empty() const noexcept -> bool {
+    auto system_event::empty() const noexcept -> bool {
         return head == this && tail == this;
     }
 
-    auto notification::error(std::exception_ptr ex) noexcept -> void {
+    auto system_event::error(std::exception_ptr ex) noexcept -> void {
         awaiters.error(ex);
         notify();
     }
 
-    auto notification::latest_events() const noexcept -> uint32_t {
+    auto system_event::latest_events() const noexcept -> uint32_t {
         return events;
     }
 
-    auto notification::notify() -> void {
-        notifier::instance().enqueue(awaiters);
+    auto system_event::notify() -> void {
+        runtime::current().enqueue(awaiters);
     }
 
-    auto notification::one_or_empty() const noexcept -> bool {
+    auto system_event::one_or_empty() const noexcept -> bool {
         return head == tail;
     }
 
-    auto notification::resume() -> void {
+    auto system_event::resume() -> void {
         awaiters.resume();
     }
 
-    auto notification::set_events(uint32_t events) -> void {
+    auto system_event::set_events(uint32_t events) -> void {
         auto update_required = false;
 
         if (events != 0 && events != this->events) {
@@ -125,12 +121,12 @@ namespace netcore::detail {
             update_required = true;
         }
 
-        if (!last_notifier) {
+        if (!last_runtime) {
             register_unscoped();
             return;
         }
 
-        if (last_notifier == &notifier::instance()) {
+        if (last_runtime == &runtime::current()) {
             if (update_required) update();
             return;
         }
@@ -140,7 +136,7 @@ namespace netcore::detail {
         );
     }
 
-    auto notification::unlink() noexcept -> void {
+    auto system_event::unlink() noexcept -> void {
         head->tail = tail;
         tail->head = head;
 
@@ -148,20 +144,20 @@ namespace netcore::detail {
         tail = this;
     }
 
-    auto notification::update() -> void {
-        notifier::instance().update(*this);
+    auto system_event::update() -> void {
+        runtime::current().update(*this);
     }
 
-    auto notification::wait(
+    auto system_event::wait(
         uint32_t events,
         void* state
-    ) -> ext::task<awaiter*> {
+    ) -> ext::task<detail::awaiter*> {
         set_events(events);
 
         TIMBER_TRACE("fd ({}) suspended", fd);
 
         try {
-            co_return co_await awaitable(awaiters, state);
+            co_return co_await detail::awaitable(awaiters, state);
             TIMBER_TRACE("fd ({}) resumed", fd);
         }
         catch (const task_canceled&) {

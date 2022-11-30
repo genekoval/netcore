@@ -1,5 +1,5 @@
 #include <netcore/async_thread.hpp>
-#include <netcore/detail/notifier.hpp>
+#include <netcore/runtime.hpp>
 
 #include <mutex>
 #include <timber/timber>
@@ -28,13 +28,13 @@ namespace netcore {
 
         const auto callback = std::stop_callback(stoken, [this] { alert(); });
 
-        auto notifier = detail::notifier(detail::notifier_options {
+        auto rt = runtime(runtime_options {
             .max_events = max_events
         });
 
         wait_for_tasks(stoken);
 
-        notifier.run();
+        rt.run();
     }
 
     auto async_thread::id() const noexcept -> std::thread::id {

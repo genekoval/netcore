@@ -1,4 +1,5 @@
 #include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 #include <netcore/server.h>
 #include <netcore/signalfd.h>
 
@@ -32,7 +33,7 @@ namespace netcore {
             if (client == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     co_await sock.wait();
-                    if (detail::notifier::instance().shutting_down()) break;
+                    if (runtime::current().shutting_down()) break;
                 }
                 else {
                     throw ext::system_error(

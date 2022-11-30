@@ -1,15 +1,14 @@
 #pragma once
 
-#include <netcore/detail/notifier.hpp>
+#include "fd.h"
+#include "system_event.hpp"
 
 namespace netcore {
     class eventfd_handle;
 
     class eventfd {
-        friend class detail::notifier;
-
         fd descriptor;
-        detail::notification notification;
+        system_event ev;
         uint64_t value = 0;
     public:
         eventfd();

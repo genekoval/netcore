@@ -1,6 +1,6 @@
 #include <netcore/async.hpp>
-#include <netcore/detail/notifier.hpp>
 #include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 #include <netcore/signalfd.h>
 
 #include <array>
@@ -21,8 +21,8 @@ namespace {
         .signals = stop_signals
     };
 
-    inline auto notifier() -> netcore::detail::notifier& {
-        return netcore::detail::notifier::instance();
+    inline auto runtime() -> netcore::runtime& {
+        return netcore::runtime::current();
     }
 
     auto async_entry(
@@ -41,7 +41,7 @@ namespace {
             exception = std::current_exception();
         }
 
-        notifier().stop();
+        runtime().stop();
     }
 
     auto wait_for_signal(std::span<const int> signals) -> ext::detached_task {
@@ -54,10 +54,10 @@ namespace {
 
             TIMBER_INFO("signal ({}): {}", signal, strsignal(signal));
 
-            if (notifier().shutting_down()) notifier().stop();
-            else notifier().shutdown();
+            if (runtime().shutting_down()) runtime().stop();
+            else runtime().shutdown();
 
-            if (notifier().one_or_empty()) break;
+            if (runtime().one_or_empty()) break;
         }
     }
 }
@@ -71,7 +71,7 @@ namespace netcore {
         const async_options& options,
         ext::task<>&& task
     ) -> void {
-        auto notifier = detail::notifier(detail::notifier_options {
+        auto rt = runtime(runtime_options {
             .max_events = options.max_events,
             .timeout = options.timeout
         });
@@ -81,7 +81,7 @@ namespace netcore {
         wait_for_signal(options.signals);
         async_entry(std::forward<ext::task<>>(task), exception);
 
-        notifier.run();
+        rt.run();
 
         if (exception) std::rethrow_exception(exception);
     }
@@ -94,7 +94,7 @@ namespace netcore {
 
             auto await_suspend(std::coroutine_handle<> coroutine) -> void {
                 awaiter.coroutine = coroutine;
-                detail::notifier::instance().enqueue(awaiter);
+                runtime::current().enqueue(awaiter);
             }
 
             auto await_resume() -> void {}

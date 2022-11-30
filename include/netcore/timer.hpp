@@ -1,6 +1,7 @@
 #pragma once
 
-#include <netcore/detail/notifier.hpp>
+#include "fd.h"
+#include "system_event.hpp"
 
 #include <chrono>
 #include <fmt/format.h>
@@ -10,7 +11,7 @@ namespace netcore {
         friend struct fmt::formatter<timer>;
 
         fd descriptor;
-        detail::notification notification;
+        system_event event;
 
         timer(int clockid);
     public:

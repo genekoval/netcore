@@ -1,6 +1,7 @@
 #include <netcore/timer.hpp>
 
 #include <ext/except.h>
+#include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <timber/timber>
 
@@ -49,7 +50,7 @@ namespace netcore {
 
     timer::timer(int clockid) :
         descriptor(timerfd_create(clockid, TFD_NONBLOCK)),
-        notification(descriptor, EPOLLIN)
+        event(descriptor, EPOLLIN)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create timer");
@@ -64,7 +65,7 @@ namespace netcore {
             .interval = nanoseconds::zero()
         });
 
-        notification.cancel();
+        event.cancel();
 
         TIMBER_TRACE("{} disarmed", *this);
     }
@@ -116,7 +117,7 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    awaiters = co_await notification.wait(0, &expirations);
+                    awaiters = co_await event.wait(0, &expirations);
                     if (expirations > 0) break;
                     continue;
                 }
@@ -124,7 +125,7 @@ namespace netcore {
                 throw ext::system_error("failed to read timer value");
             }
 
-            notification.notify(expirations);
+            event.notify(expirations);
             if (awaiters) awaiters->assign(expirations);
         } while (retval != sizeof(expirations));
 

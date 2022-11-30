@@ -1,4 +1,5 @@
 #include <netcore/event.hpp>
+#include <netcore/runtime.hpp>
 
 namespace netcore {
     auto event<void>::emit() -> void {
@@ -17,6 +18,6 @@ namespace netcore::detail {
     }
 
     auto event::emit() -> void {
-        detail::notifier::instance().enqueue(listeners);
+        runtime::current().enqueue(listeners);
     }
 }

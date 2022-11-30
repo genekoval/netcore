@@ -1,7 +1,6 @@
 #pragma once
 
-#include <netcore/detail/awaiter.hpp>
-#include <netcore/detail/notifier.hpp>
+#include "detail/awaiter.hpp"
 
 #include <ext/coroutine>
 

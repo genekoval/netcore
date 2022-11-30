@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <ext/except.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <timber/timber>

@@ -2,12 +2,13 @@
 
 #include <ext/except.h>
 #include <sys/eventfd.h>
+#include <sys/epoll.h>
 #include <timber/timber>
 
 namespace netcore {
     eventfd::eventfd() :
         descriptor(::eventfd(0, EFD_NONBLOCK)),
-        notification(descriptor, EPOLLIN)
+        ev(descriptor, EPOLLIN)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create eventfd");
@@ -28,7 +29,7 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await notification.wait(0, nullptr);
+                    co_await ev.wait(0, nullptr);
                     continue;
                 }
 

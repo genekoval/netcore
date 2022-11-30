@@ -1,6 +1,6 @@
 #include <netcore/detail/awaiter.hpp>
-#include <netcore/detail/notifier.hpp>
 #include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 
 #include <utility>
 
@@ -89,9 +89,9 @@ namespace netcore::detail {
     }
 
     auto awaitable::await_suspend(std::coroutine_handle<> coroutine) -> void {
-        const auto status = notifier::instance().status();
+        const auto status = runtime::current().status();
 
-        if (status == notifier_status::force_shutdown) {
+        if (status == runtime_status::force_shutdown) {
             throw task_canceled();
         }
 

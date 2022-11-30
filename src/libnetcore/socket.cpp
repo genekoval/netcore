@@ -3,6 +3,7 @@
 #include <cstring>
 #include <ext/except.h>
 #include <iostream>
+#include <sys/epoll.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <timber/timber>
@@ -12,7 +13,7 @@
 namespace netcore {
     socket::socket(int fd, uint32_t events) :
         descriptor(fd),
-        notification(fd, events)
+        event(fd, events)
     {
         TIMBER_TRACE("{} created", *this);
     }
@@ -28,7 +29,7 @@ namespace netcore {
     socket::operator int() const { return descriptor; }
 
     auto socket::deregister() -> void {
-        notification.deregister();
+        event.deregister();
     }
 
     auto socket::end() const -> void {
@@ -64,7 +65,7 @@ namespace netcore {
     }
 
     auto socket::register_scoped() -> register_guard {
-        return notification.register_scoped();
+        return event.register_scoped();
     }
 
     auto socket::sendfile(
@@ -101,8 +102,8 @@ namespace netcore {
 
     auto socket::valid() const -> bool { return descriptor.valid(); }
 
-    auto socket::wait(uint32_t event) -> ext::task<> {
-        co_await notification.wait(event, nullptr);
+    auto socket::wait(uint32_t events) -> ext::task<> {
+        co_await event.wait(events, nullptr);
     }
 
     auto socket::write(

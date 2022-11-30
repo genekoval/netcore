@@ -8,7 +8,7 @@
 namespace netcore {
     class signalfd {
         const fd descriptor;
-        detail::notification notification;
+        system_event event;
 
         signalfd(int descriptor);
 

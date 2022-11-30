@@ -1,5 +1,5 @@
-#include <netcore/detail/notifier.hpp>
 #include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 
 #include <cassert>
 #include <chrono>
@@ -9,35 +9,35 @@
 using namespace std::chrono_literals;
 
 template <>
-struct fmt::formatter<netcore::detail::notifier> {
+struct fmt::formatter<netcore::runtime> {
     constexpr auto parse(auto& ctx) {
         return ctx.begin();
     }
 
-    auto format(const netcore::detail::notifier& notifier, auto& ctx) {
-        return format_to(ctx.out(), "notifier ({})", notifier.descriptor);
+    auto format(const netcore::runtime& runtime, auto& ctx) {
+        return format_to(ctx.out(), "runtime ({})", runtime.descriptor);
     }
 };
 
 namespace {
-    thread_local netcore::detail::notifier* instance_ptr = nullptr;
+    thread_local netcore::runtime* current_ptr = nullptr;
 }
 
-namespace netcore::detail {
+namespace netcore {
     using clock = std::chrono::steady_clock;
     using std::chrono::duration_cast;
     using std::chrono::milliseconds;
 
-    auto notifier::instance() -> notifier& {
+    auto runtime::current() -> runtime& {
         assert(
-            (instance_ptr != nullptr) &&
+            (current_ptr != nullptr) &&
             "no active runtime in current thread"
         );
 
-        return *instance_ptr;
+        return *current_ptr;
     }
 
-    notifier::notifier(const notifier_options& options) :
+    runtime::runtime(const runtime_options& options) :
         events(std::make_unique<epoll_event[]>(options.max_events)),
         max_events(options.max_events),
         timeout(options.timeout),
@@ -47,121 +47,121 @@ namespace netcore::detail {
             throw ext::system_error("epoll create failure");
         }
 
-        if (instance_ptr) {
+        if (current_ptr) {
             throw std::runtime_error(
-                "notifier cannot be created: already exists"
+                "runtime cannot be created: already exists"
             );
         }
 
-        instance_ptr = this;
+        current_ptr = this;
 
         TIMBER_TRACE("{} created", *this);
     }
 
-    notifier::~notifier() {
-        instance_ptr = nullptr;
+    runtime::~runtime() {
+        current_ptr = nullptr;
     }
 
-    auto notifier::add(notification& notification) -> void {
-        if (stat == notifier_status::force_shutdown) throw task_canceled();
+    auto runtime::add(system_event& event) -> void {
+        if (stat == runtime_status::force_shutdown) throw task_canceled();
 
-        notifications.append(notification);
+        system_events.append(event);
 
-        auto event = epoll_event {
-            .events = notification.events,
+        auto ev = epoll_event {
+            .events = event.events,
             .data = {
-                .ptr = &notification
+                .ptr = &event
             }
         };
 
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_ADD,
-            notification.fd,
-            &event
+            event.fd,
+            &ev
         ) == -1) {
-            TIMBER_DEBUG("{} failed to add entry ({})", *this, notification.fd);
+            TIMBER_DEBUG("{} failed to add entry ({})", *this, event.fd);
             throw ext::system_error("failed to add entry to interest list");
         }
 
-        TIMBER_TRACE("{} added entry ({})", *this, notification.fd);
+        TIMBER_TRACE("{} added entry ({})", *this, event.fd);
     }
 
-    auto notifier::cancel() -> void {
+    auto runtime::cancel() -> void {
         TIMBER_TRACE("{} canceling tasks", *this);
 
-        auto* current = &notifications;
+        auto* current = &system_events;
 
         do {
             current->notify();
             current = current->head;
-        } while (current != &notifications);
+        } while (current != &system_events);
 
         pending.cancel();
         pending.resume();
     }
 
-    auto notifier::empty() const noexcept -> bool {
-        return notifications.empty() && pending.empty();
+    auto runtime::empty() const noexcept -> bool {
+        return system_events.empty() && pending.empty();
     }
 
-    auto notifier::enqueue(awaiter& a) -> void {
+    auto runtime::enqueue(detail::awaiter& a) -> void {
         pending.enqueue(a);
     }
 
-    auto notifier::enqueue(awaiter_queue& awaiters) -> void {
+    auto runtime::enqueue(detail::awaiter_queue& awaiters) -> void {
         pending.enqueue(awaiters);
     }
 
-    auto notifier::one_or_empty() const noexcept -> bool {
-        return notifications.one_or_empty();
+    auto runtime::one_or_empty() const noexcept -> bool {
+        return system_events.one_or_empty();
     }
 
-    auto notifier::remove(notification& notification) -> void {
+    auto runtime::remove(system_event& event) -> void {
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_DEL,
-            notification.fd,
+            event.fd,
             nullptr
         ) == -1) {
             TIMBER_DEBUG(
                 "{} failed to remove entry ({})",
                 *this,
-                notification.fd
+                event.fd
             );
             throw ext::system_error("failed to remove entry in interest list");
         }
 
-        TIMBER_TRACE("{} removed entry ({})", *this, notification.fd);
+        TIMBER_TRACE("{} removed entry ({})", *this, event.fd);
     }
 
-    auto notifier::resume_all() -> void {
+    auto runtime::resume_all() -> void {
         TIMBER_TRACE("{} resuming all", *this);
 
-        auto* current = &notifications;
+        auto* current = &system_events;
 
         do {
             auto* const next = current->head;
             current->resume();
             current = next;
-        } while (current != &notifications);
+        } while (current != &system_events);
 
         pending.resume();
     }
 
-    auto notifier::run() -> void {
-        if (stat != notifier_status::stopped) return;
+    auto runtime::run() -> void {
+        if (stat != runtime_status::stopped) return;
 
         auto graceful_timeout = timeout;
 
         TIMBER_TRACE("{} starting up", *this);
-        stat = notifier_status::running;
+        stat = runtime_status::running;
 
         while (!empty()) {
             auto timeout = static_cast<long>(-1);
 
             if (!pending.empty()) timeout = 0;
-            else if (stat == notifier_status::graceful_shutdown) {
+            else if (stat == runtime_status::graceful_shutdown) {
                 timeout = graceful_timeout.count();
             }
 
@@ -187,7 +187,7 @@ namespace netcore::detail {
                 ready
             );
 
-            if (stat == notifier_status::graceful_shutdown) {
+            if (stat == runtime_status::graceful_shutdown) {
                 graceful_timeout -= wait_time;
 
                 if (graceful_timeout <= 0ms) {
@@ -207,27 +207,27 @@ namespace netcore::detail {
             }
 
             for (auto i = 0; i < ready; ++i) {
-                const auto& event = events[i];
-                auto& notif = *static_cast<notification*>(event.data.ptr);
+                const auto& ev = events[i];
+                auto& event = *static_cast<system_event*>(ev.data.ptr);
 
-                notif.events = event.events;
-                notif.resume();
+                event.events = ev.events;
+                event.resume();
             }
 
             pending.resume();
         }
 
-        stat = notifier_status::stopped;
+        stat = runtime_status::stopped;
         TIMBER_TRACE("{} stopped", *this);
     }
 
-    auto notifier::shutdown() noexcept -> void {
-        if (stat == notifier_status::stopped) {
+    auto runtime::shutdown() noexcept -> void {
+        if (stat == runtime_status::stopped) {
             TIMBER_DEBUG("{} shutdown request ignored: already stopped", *this);
             return;
         }
 
-        if (stat == notifier_status::force_shutdown) {
+        if (stat == runtime_status::force_shutdown) {
             TIMBER_DEBUG(
                 "{} shutdown request ignored: force shutdown in progress",
                 *this
@@ -236,48 +236,48 @@ namespace netcore::detail {
         }
 
         TIMBER_TRACE("{} received shutdown request", *this);
-        stat = notifier_status::graceful_shutdown;
+        stat = runtime_status::graceful_shutdown;
         resume_all();
     }
 
-    auto notifier::shutting_down() const noexcept -> bool {
+    auto runtime::shutting_down() const noexcept -> bool {
         return
-            stat == notifier_status::graceful_shutdown ||
-            stat == notifier_status::force_shutdown;
+            stat == runtime_status::graceful_shutdown ||
+            stat == runtime_status::force_shutdown;
     }
 
-    auto notifier::status() const noexcept -> notifier_status {
+    auto runtime::status() const noexcept -> runtime_status {
         return stat;
     }
 
-    auto notifier::stop() noexcept -> void {
+    auto runtime::stop() noexcept -> void {
         TIMBER_TRACE("{} received stop request", *this);
-        stat = notifier_status::force_shutdown;
+        stat = runtime_status::force_shutdown;
         cancel();
     }
 
-    auto notifier::update(notification& notification) -> void {
-        auto event = epoll_event {
-            .events = notification.events,
+    auto runtime::update(system_event& event) -> void {
+        auto ev = epoll_event {
+            .events = event.events,
             .data = {
-                .ptr = &notification
+                .ptr = &event
             }
         };
 
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_MOD,
-            notification.fd,
-            &event
+            event.fd,
+            &ev
         ) == -1) {
             TIMBER_DEBUG(
                 "{} failed to modify entry ({})",
                 *this,
-                notification.fd
+                event.fd
             );
             throw ext::system_error("failed to modify entry in interest list");
         }
 
-        TIMBER_TRACE("{} updated entry ({})", *this, notification.fd);
+        TIMBER_TRACE("{} updated entry ({})", *this, event.fd);
     }
 }
