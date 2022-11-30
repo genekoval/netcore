@@ -30,19 +30,19 @@ namespace {
 }
 
 TEST(Timer, WaitUnderSecond) {
-    netcore::async([]() -> ext::task<> {
+    netcore::run([]() -> ext::task<> {
         co_await wait(100ms);
     }());
 }
 
 TEST(Timer, WaitSecond) {
-    netcore::async([]() -> ext::task<> {
+    netcore::run([]() -> ext::task<> {
         co_await wait(1s);
     }());
 }
 
 TEST(Timer, Disarm) {
-    netcore::async([]() -> ext::task<> {
+    netcore::run([]() -> ext::task<> {
         constexpr auto time = 200ms;
 
         const auto task = [](

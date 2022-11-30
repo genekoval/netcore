@@ -65,7 +65,7 @@ TEST(ServerTest, Connection) {
         EXPECT_EQ(number + 1, result);
     };
 
-    netcore::async(task());
+    netcore::run(task());
 
     server.stop();
 }

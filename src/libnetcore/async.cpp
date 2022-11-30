@@ -10,7 +10,7 @@
 using namespace std::chrono_literals;
 
 namespace {
-    constexpr auto stop_signals = std::array {
+    constexpr auto default_signals = std::array {
         SIGINT,
         SIGTERM
     };
@@ -18,46 +18,26 @@ namespace {
     constexpr auto default_options = netcore::async_options {
         .max_events = SOMAXCONN,
         .timeout = 90s,
-        .signals = stop_signals
+        .signals = default_signals
     };
 
-    inline auto runtime() -> netcore::runtime& {
-        return netcore::runtime::current();
-    }
-
-    auto async_entry(
-        ext::task<>&& task,
-        std::exception_ptr& exception
+    auto wait_for_signal(
+        netcore::runtime& runtime,
+        std::span<const int> signals
     ) -> ext::detached_task {
-        auto t = std::forward<ext::task<>>(task);
-
-        try {
-            co_await t;
-        }
-        catch (const netcore::task_canceled&) {
-            TIMBER_DEBUG("main task canceled");
-        }
-        catch (...) {
-            exception = std::current_exception();
-        }
-
-        runtime().stop();
-    }
-
-    auto wait_for_signal(std::span<const int> signals) -> ext::detached_task {
-        auto sig = netcore::signalfd::create(signals);
+        auto signalfd = netcore::signalfd::create(signals);
         auto signal = 0;
 
         while (true) {
-            signal = co_await sig.wait_for_signal();
+            signal = co_await signalfd.wait_for_signal();
             if (signal <= 0) break;
 
             TIMBER_INFO("signal ({}): {}", signal, strsignal(signal));
 
-            if (runtime().shutting_down()) runtime().stop();
-            else runtime().shutdown();
+            if (runtime.shutting_down()) runtime.stop();
+            else runtime.shutdown();
 
-            if (runtime().one_or_empty()) break;
+            if (runtime.one_or_empty()) break;
         }
     }
 }
@@ -76,14 +56,13 @@ namespace netcore {
             .timeout = options.timeout
         });
 
-        auto exception = std::exception_ptr();
+        wait_for_signal(rt, options.signals);
 
-        wait_for_signal(options.signals);
-        async_entry(std::forward<ext::task<>>(task), exception);
+        rt.run(std::forward<ext::task<>>(task));
+    }
 
-        rt.run();
-
-        if (exception) std::rethrow_exception(exception);
+    auto run(ext::task<>&& task) -> void {
+        netcore::runtime::current().run(std::forward<ext::task<>>(task));
     }
 
     auto yield() -> ext::task<> {

@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 TEST(Event, Void) {
-    netcore::async([]() -> ext::task<> {
+    netcore::run([]() -> ext::task<> {
         auto event = netcore::event();
         auto emitted = false;
 
@@ -22,7 +22,7 @@ TEST(Event, Void) {
 }
 
 TEST(Event, Value) {
-    netcore::async([]() -> ext::task<> {
+    netcore::run([]() -> ext::task<> {
         auto event = netcore::event<int>();
 
         [](netcore::event<int>& event) -> ext::detached_task {

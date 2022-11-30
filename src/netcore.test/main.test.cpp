@@ -1,3 +1,5 @@
+#include <netcore/runtime.hpp>
+
 #include <filesystem>
 #include <fmt/chrono.h>
 #include <fmt/os.h>
@@ -5,6 +7,8 @@
 #include <timber/timber>
 
 namespace fs = std::filesystem;
+
+using namespace std::chrono_literals;
 
 namespace {
     const auto log_path = fs::temp_directory_path() / "netcore.test.log";
@@ -27,6 +31,11 @@ namespace {
 auto main(int argc, char** argv) -> int {
     timber::thread_name = std::string("main");
     timber::log_handler = &file_logger;
+
+    const auto runtime = netcore::runtime(netcore::runtime_options {
+        .max_events = 64,
+        .timeout = 0s
+    });
 
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

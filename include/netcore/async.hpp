@@ -17,6 +17,8 @@ namespace netcore {
 
     auto async(const async_options& options, ext::task<>&& task) -> void;
 
+    auto run(ext::task<>&& task) -> void;
+
     template <typename Rep, typename Period>
     auto sleep_for(
         const std::chrono::duration<Rep, Period>& duration

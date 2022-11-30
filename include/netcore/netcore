@@ -5,6 +5,7 @@
 #include "except.hpp"
 #include "fd.h"
 #include "file.hpp"
+#include "runtime.hpp"
 #include "server.h"
 #include "signalfd.h"
 #include "socket.h"

@@ -221,6 +221,31 @@ namespace netcore {
         TIMBER_TRACE("{} stopped", *this);
     }
 
+    auto runtime::run(ext::task<>&& task) -> void {
+        auto exception = std::exception_ptr();
+
+        run_main_task(std::forward<ext::task<>>(task), exception);
+        run();
+
+        if (exception) std::rethrow_exception(exception);
+    }
+
+    auto runtime::run_main_task(
+        ext::task<>&& task,
+        std::exception_ptr& exception
+    ) -> ext::detached_task {
+        const auto t = std::forward<ext::task<>>(task);
+
+        try {
+            co_await t;
+        }
+        catch (...) {
+            exception = std::current_exception();
+        }
+
+        stop();
+    }
+
     auto runtime::shutdown() noexcept -> void {
         if (stat == runtime_status::stopped) {
             TIMBER_DEBUG("{} shutdown request ignored: already stopped", *this);

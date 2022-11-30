@@ -35,6 +35,11 @@ namespace netcore {
         auto empty() const noexcept -> bool;
 
         auto resume_all() -> void;
+
+        auto run_main_task(
+            ext::task<>&& task,
+            std::exception_ptr& exception
+        ) -> ext::detached_task;
     public:
         static auto current() -> runtime&;
 
@@ -51,6 +56,8 @@ namespace netcore {
         auto remove(system_event& system_event) -> void;
 
         auto run() -> void;
+
+        auto run(ext::task<>&& task) -> void;
 
         auto shutting_down() const noexcept -> bool;
 
