@@ -37,6 +37,11 @@ namespace netcore {
         return *current_ptr;
     }
 
+    runtime::runtime() : runtime(runtime_options {
+        .max_events = SOMAXCONN,
+        .timeout = 0s
+    }) {}
+
     runtime::runtime(const runtime_options& options) :
         events(std::make_unique<epoll_event[]>(options.max_events)),
         max_events(options.max_events),

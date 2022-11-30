@@ -10,7 +10,7 @@
 
 namespace netcore {
     struct runtime_options {
-        int max_events = SOMAXCONN;
+        int max_events;
         std::chrono::seconds timeout;
     };
 
@@ -44,6 +44,8 @@ namespace netcore {
         static auto current() -> runtime&;
 
         const fd descriptor;
+
+        runtime();
 
         runtime(const runtime_options& options);
 
