@@ -5,67 +5,87 @@
 
 namespace fs = std::filesystem;
 
-using type = netcore::fork_server::process_type;
+using testing::Test;
 
-constexpr auto socket_name = "netcore.sock";
+namespace {
+    using number_type = std::int32_t;
 
-const auto unix_socket = netcore::unix_socket {
-    .path = fs::path(TESTDIR) / socket_name,
-    .mode = fs::perms::owner_read | fs::perms::owner_write
-};
+    constexpr auto socket_name = "netcore.test.sock";
 
-const auto increment = [](auto&& socket) -> ext::task<> {
-    auto number = std::int32_t();
-    co_await socket.read(&number, sizeof(number));
-
-    TIMBER_DEBUG("increment: received {}", number);
-
-    number++;
-    co_await socket.write(&number, sizeof(number));
-};
-
-TEST(ServerTest, StartStop) {
-    auto server = netcore::fork_server(increment);
-
-    if (type::server == server.start(
-        unix_socket,
-        []() {
-            TIMBER_INFO("Listening for connections");
-        }
-    )) { std::exit(0); }
-
-    ASSERT_TRUE(std::filesystem::is_socket(unix_socket.path));
-
-    const auto code = server.stop();
-    ASSERT_EQ(0, code);
-}
-
-TEST(ServerTest, Connection) {
-    constexpr auto number = 3;
-
-    auto server = netcore::fork_server(increment);
-
-    if (type::server == server.start(
-        unix_socket,
-        []() {
-            TIMBER_INFO("Listening for connections");
-        }
-    )) { std::exit(0); }
-
-    const auto task = [number]() -> ext::task<> {
-        auto client = co_await netcore::connect(
-            unix_socket.path.string()
-        );
-
-        co_await client.write(&number, sizeof(number));
-
-        auto result = decltype(number)(0);
-        co_await client.read(&result, sizeof(result));
-
-        EXPECT_EQ(number + 1, result);
+    template <typename F>
+    concept client_handler = requires(const F& f, netcore::socket&& client) {
+        {
+            f(std::forward<netcore::socket>(client))
+        } -> std::same_as<ext::task<>>;
     };
 
-    netcore::run(task());
+    const auto unix_socket = netcore::unix_socket {
+        .path = fs::temp_directory_path() / socket_name,
+        .mode = fs::perms::owner_read | fs::perms::owner_write
+    };
 
-    server.stop();
+    const auto increment = [](auto&& socket) -> ext::task<> {
+        number_type number = 0;
+        co_await socket.read(&number, sizeof(number_type));
+
+        TIMBER_DEBUG("increment: received {}", number);
+
+        number++;
+        co_await socket.write(&number, sizeof(number_type));
+    };
+}
+
+class ServerTest : public Test {
+    auto listen(netcore::event<>& event) -> ext::detached_task {
+        co_await server.listen(unix_socket, [] {
+            TIMBER_INFO("Test server listening for connections");
+        });
+    }
+protected:
+    netcore::server server;
+
+    ServerTest() : server(increment) {}
+
+    auto connect(const client_handler auto& handler) -> void {
+        netcore::run([&]() -> ext::task<> {
+            netcore::event<> event;
+
+            listen(event);
+
+            auto client = co_await netcore::connect(unix_socket.path.string());
+            co_await handler(std::move(client));
+
+            // The handler may not have suspended.
+            // Yield to make sure the runtime starts.
+            co_await netcore::yield();
+
+            // Stop the server and place the server task in the queue.
+            netcore::runtime::current().shutdown();
+
+            // Place this task behind the server task in the queue.
+            co_await netcore::yield();
+        }());
+    }
+};
+
+TEST_F(ServerTest, StartStop) {
+    connect([&](netcore::socket&& client) -> ext::task<> {
+        EXPECT_TRUE(fs::is_socket(unix_socket.path));
+        co_return;
+    });
+
+    EXPECT_FALSE(fs::exists(unix_socket.path));
+}
+
+TEST_F(ServerTest, Connection) {
+    connect([](netcore::socket&& client) -> ext::task<> {
+        constexpr number_type number = 3;
+
+        co_await client.write(&number, sizeof(number_type));
+
+        number_type result = 0;
+        co_await client.read(&result, sizeof(number_type));
+
+        EXPECT_EQ(number + 1, result);
+    });
 }

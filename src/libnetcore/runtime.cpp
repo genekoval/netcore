@@ -37,10 +37,7 @@ namespace netcore {
         return *current_ptr;
     }
 
-    runtime::runtime() : runtime(runtime_options {
-        .max_events = SOMAXCONN,
-        .timeout = 0s
-    }) {}
+    runtime::runtime() : runtime(runtime_options{}) {}
 
     runtime::runtime(const runtime_options& options) :
         events(std::make_unique<epoll_event[]>(options.max_events)),
@@ -112,6 +109,15 @@ namespace netcore {
         pending.enqueue(awaiters);
     }
 
+    auto runtime::notify() -> void {
+        auto* current = &system_events;
+
+        do {
+            current->notify();
+            current = current->head;
+        } while (current != &system_events);
+    }
+
     auto runtime::one_or_empty() const noexcept -> bool {
         return system_events.one_or_empty();
     }
@@ -165,6 +171,10 @@ namespace netcore {
         // Make a local, mutable copy for this run.
         auto graceful_timeout = timeout;
 
+        // Ensure the runtime goes through at least one loop after graceful
+        // shutdown begins even if the timeout is zero.
+        auto shutdown_ran = false;
+
         // When the status has been set to 'force shutdown', all remaining
         // tasks will be in the 'pending' queue.
         while (!(stat == runtime_status::force_shutdown && pending.empty())) {
@@ -200,7 +210,7 @@ namespace netcore {
             if (stat == runtime_status::graceful_shutdown) {
                 graceful_timeout -= wait_time;
 
-                if (graceful_timeout <= 0ms) {
+                if (shutdown_ran && graceful_timeout <= 0ms) {
                     TIMBER_DEBUG(
                         "{} graceful timeout reached: stopping",
                         *this
@@ -208,6 +218,8 @@ namespace netcore {
 
                     stop();
                 }
+
+                shutdown_ran = true;
             }
 
             if (ready == -1) {
@@ -274,7 +286,7 @@ namespace netcore {
 
         TIMBER_TRACE("{} received shutdown request", *this);
         stat = runtime_status::graceful_shutdown;
-        resume_all();
+        notify();
     }
 
     auto runtime::shutting_down() const noexcept -> bool {

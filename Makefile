@@ -18,5 +18,3 @@ install.directories = $(include)/$(project)
 files = $(include) $(src) Makefile VERSION
 
 include mkbuild/base.mk
-
-$($(test).objects): CXXFLAGS += -DTESTDIR='"$(build)"'

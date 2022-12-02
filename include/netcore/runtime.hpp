@@ -10,8 +10,8 @@
 
 namespace netcore {
     struct runtime_options {
-        int max_events;
-        std::chrono::seconds timeout;
+        int max_events = SOMAXCONN;
+        std::chrono::seconds timeout = std::chrono::seconds::zero();
     };
 
     enum class runtime_status : uint8_t {
@@ -31,6 +31,8 @@ namespace netcore {
         runtime_status stat = runtime_status::stopped;
 
         auto cancel() -> void;
+
+        auto notify() -> void;
 
         auto resume_all() -> void;
 
