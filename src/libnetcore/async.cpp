@@ -62,7 +62,7 @@ namespace netcore {
     }
 
     auto run(ext::task<>&& task) -> void {
-        netcore::runtime::current().run(std::forward<ext::task<>>(task));
+        runtime::current().run(std::forward<ext::task<>>(task));
     }
 
     auto yield() -> ext::task<> {

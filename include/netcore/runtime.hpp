@@ -32,9 +32,12 @@ namespace netcore {
 
         auto cancel() -> void;
 
-        auto empty() const noexcept -> bool;
-
         auto resume_all() -> void;
+
+        /**
+         * Perform either a normal or EOL (end of life) run.
+         */
+        auto run(bool eol) -> void;
 
         auto run_main_task(
             ext::task<>&& task,
@@ -45,6 +48,11 @@ namespace netcore {
 
         const fd descriptor;
 
+        /**
+         * Creates a runtime with the following default options:
+         * - Max Events: SOMAXCONN
+         * - Timeout: 0 seconds
+         */
         runtime();
 
         runtime(const runtime_options& options);

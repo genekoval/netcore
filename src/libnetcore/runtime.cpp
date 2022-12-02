@@ -64,12 +64,11 @@ namespace netcore {
     }
 
     runtime::~runtime() {
+        run(true);
         current_ptr = nullptr;
     }
 
     auto runtime::add(system_event& event) -> void {
-        if (stat == runtime_status::force_shutdown) throw task_canceled();
-
         system_events.append(event);
 
         auto ev = epoll_event {
@@ -95,19 +94,14 @@ namespace netcore {
     auto runtime::cancel() -> void {
         TIMBER_TRACE("{} canceling tasks", *this);
 
+        pending.cancel();
+
         auto* current = &system_events;
 
         do {
-            current->notify();
+            current->cancel();
             current = current->head;
         } while (current != &system_events);
-
-        pending.cancel();
-        pending.resume();
-    }
-
-    auto runtime::empty() const noexcept -> bool {
-        return system_events.empty() && pending.empty();
     }
 
     auto runtime::enqueue(detail::awaiter& a) -> void {
@@ -155,15 +149,26 @@ namespace netcore {
     }
 
     auto runtime::run() -> void {
-        if (stat != runtime_status::stopped) return;
+        run(false);
+    }
 
+    auto runtime::run(bool eol) -> void {
+        if (eol) {
+            TIMBER_TRACE("{} performing final end-of-life run", *this);
+            stat = runtime_status::force_shutdown;
+        }
+        else if (stat == runtime_status::stopped) {
+            TIMBER_TRACE("{} starting up", *this);
+            stat = runtime_status::running;
+        }
+
+        // Make a local, mutable copy for this run.
         auto graceful_timeout = timeout;
 
-        TIMBER_TRACE("{} starting up", *this);
-        stat = runtime_status::running;
-
-        while (!empty()) {
-            auto timeout = static_cast<long>(-1);
+        // When the status has been set to 'force shutdown', all remaining
+        // tasks will be in the 'pending' queue.
+        while (!(stat == runtime_status::force_shutdown && pending.empty())) {
+            long timeout = -1;
 
             if (!pending.empty()) timeout = 0;
             else if (stat == runtime_status::graceful_shutdown) {
@@ -247,6 +252,8 @@ namespace netcore {
         catch (...) {
             exception = std::current_exception();
         }
+
+        TIMBER_DEBUG("{} main task complete", *this);
 
         stop();
     }

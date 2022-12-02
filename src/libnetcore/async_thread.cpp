@@ -1,6 +1,7 @@
 #include <netcore/async_thread.hpp>
 #include <netcore/runtime.hpp>
 
+#include <fmt/ostream.h>
 #include <mutex>
 #include <timber/timber>
 
@@ -26,7 +27,12 @@ namespace netcore {
     ) -> void {
         timber::thread_name = name;
 
-        const auto callback = std::stop_callback(stoken, [this] { alert(); });
+        TIMBER_DEBUG("Thread created with ID: {}", id());
+
+        const auto callback = std::stop_callback(stoken, [this, &name] {
+            TIMBER_DEBUG(R"(Requesting to stop thread "{}" ({}))", name, id());
+            alert();
+        });
 
         auto rt = runtime(runtime_options {
             .max_events = max_events
@@ -109,9 +115,15 @@ namespace netcore {
         while (true) {
             run_tasks();
 
-            if (stoken.stop_requested()) break;
+            if (stoken.stop_requested()) {
+                TIMBER_DEBUG("Thread stop request received");
+                runtime::current().stop();
+                break;
+            }
 
             co_await event.wait();
         }
+
+        TIMBER_TRACE("Exiting task loop");
     }
 }
