@@ -14,9 +14,8 @@ namespace {
 
     template <typename F>
     concept client_handler = requires(const F& f, netcore::socket&& client) {
-        {
-            f(std::forward<netcore::socket>(client))
-        } -> std::same_as<ext::task<>>;
+        { f(std::forward<netcore::socket>(client)) } ->
+            std::same_as<ext::task<>>;
     };
 
     const auto unix_socket = netcore::unix_socket {
@@ -24,47 +23,58 @@ namespace {
         .mode = fs::perms::owner_read | fs::perms::owner_write
     };
 
-    const auto increment = [](auto&& socket) -> ext::task<> {
-        number_type number = 0;
-        co_await socket.read(&number, sizeof(number_type));
+    struct server_context {
+        netcore::event<> closed;
 
-        TIMBER_DEBUG("increment: received {}", number);
+        auto close() -> void {
+            TIMBER_INFO("Test server closed");
+            closed.emit();
+        }
 
-        number++;
-        co_await socket.write(&number, sizeof(number_type));
+        auto connection(netcore::socket&& client) -> ext::task<> {
+            number_type number = 0;
+            co_await client.read(&number, sizeof(number_type));
+
+            TIMBER_DEBUG("increment: received {}", number);
+
+            ++number;
+            co_await client.write(&number, sizeof(number_type));
+        }
+
+        auto listen() -> void {
+            TIMBER_INFO("Test server listening for connections");
+        }
     };
 }
 
 class ServerTest : public Test {
-    auto listen(netcore::event<>& event) -> ext::detached_task {
-        co_await server.listen(unix_socket, [] {
-            TIMBER_INFO("Test server listening for connections");
-        });
+    auto close() -> ext::task<> {
+        return server.context.closed.listen();
+    }
+
+    auto connect() -> ext::task<netcore::socket> {
+        co_return co_await netcore::connect(unix_socket.path.string());
+    }
+
+    auto listen() -> ext::detached_task {
+        co_await server.listen(unix_socket);
+    }
+
+    auto task(const client_handler auto& handler) -> ext::task<> {
+        listen();
+
+        co_await handler(co_await connect());
+
+        server.close();
+        co_await close();
     }
 protected:
-    netcore::server server;
+    netcore::server<server_context> server;
 
-    ServerTest() : server(increment) {}
+    ServerTest() : server() {}
 
     auto connect(const client_handler auto& handler) -> void {
-        netcore::run([&]() -> ext::task<> {
-            netcore::event<> event;
-
-            listen(event);
-
-            auto client = co_await netcore::connect(unix_socket.path.string());
-            co_await handler(std::move(client));
-
-            // The handler may not have suspended.
-            // Yield to make sure the runtime starts.
-            co_await netcore::yield();
-
-            // Stop the server and place the server task in the queue.
-            netcore::runtime::current().shutdown();
-
-            // Place this task behind the server task in the queue.
-            co_await netcore::yield();
-        }());
+        netcore::run(task(handler));
     }
 };
 

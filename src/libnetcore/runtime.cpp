@@ -1,3 +1,4 @@
+#include <netcore/async.hpp>
 #include <netcore/except.hpp>
 #include <netcore/runtime.hpp>
 
@@ -257,6 +258,11 @@ namespace netcore {
         std::exception_ptr& exception
     ) -> ext::detached_task {
         const auto t = std::forward<ext::task<>>(task);
+
+        // Wait for the runtime to start.
+        co_await yield();
+
+        TIMBER_DEBUG("{} main task starting", *this);
 
         try {
             co_await t;

@@ -23,6 +23,8 @@ namespace netcore {
 
         auto end() const -> void;
 
+        auto notify() -> void;
+
         auto read(
             void* buffer,
             std::size_t len

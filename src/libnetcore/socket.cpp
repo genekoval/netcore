@@ -40,6 +40,10 @@ namespace netcore {
         TIMBER_DEBUG("{} shutdown transmissions", *this);
     }
 
+    auto socket::notify() -> void {
+        event.notify();
+    }
+
     auto socket::read(
         void* buffer,
         std::size_t len
