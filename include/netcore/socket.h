@@ -19,6 +19,8 @@ namespace netcore {
 
         operator int() const;
 
+        auto cancel() noexcept -> void;
+
         auto deregister() -> void;
 
         auto end() const -> void;

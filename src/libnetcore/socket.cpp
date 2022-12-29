@@ -28,6 +28,10 @@ namespace netcore {
 
     socket::operator int() const { return descriptor; }
 
+    auto socket::cancel() noexcept -> void {
+        event.cancel();
+    }
+
     auto socket::deregister() -> void {
         event.deregister();
     }
