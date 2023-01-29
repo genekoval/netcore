@@ -237,6 +237,12 @@ namespace netcore {
                 event.resume();
             }
 
+            TIMBER_DEBUG(
+                "{} pending tasks to resume: {:L}",
+                *this,
+                pending.size()
+            );
+
             pending.resume();
         }
 

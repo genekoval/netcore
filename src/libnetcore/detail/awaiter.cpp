@@ -62,6 +62,18 @@ namespace netcore::detail {
         if (head) head->error(ex);
     }
 
+    auto awaiter_queue::pop() noexcept -> awaiter* {
+        if (!head) return nullptr;
+
+        if (head == tail) tail = nullptr;
+
+        auto* a = head;
+        head = a->next;
+        a->next = nullptr;
+
+        return a;
+    }
+
     auto awaiter_queue::resume() -> void {
         // Make a local copy of the awaiter list, and create a new list
         // as resumed coroutines could add more awaiters.
@@ -76,6 +88,19 @@ namespace netcore::detail {
 
             if (coroutine && !coroutine.done()) coroutine.resume();
         }
+    }
+
+    auto awaiter_queue::size() -> std::size_t {
+        std::size_t n = 0;
+
+        auto* current = head;
+
+        while (current) {
+            ++n;
+            current = current->next;
+        }
+
+        return n;
     }
 
     awaitable::awaitable(awaiter_queue& awaiters, void* state) :

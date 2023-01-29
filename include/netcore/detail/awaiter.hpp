@@ -2,6 +2,7 @@
 
 #include <coroutine>
 #include <exception>
+#include <optional>
 
 namespace netcore::detail {
     struct awaiter final {
@@ -56,7 +57,11 @@ namespace netcore::detail {
 
         auto error(std::exception_ptr ex) noexcept -> void;
 
+        auto pop() noexcept -> awaiter*;
+
         auto resume() -> void;
+
+        auto size() -> std::size_t;
     };
 
     class awaitable final {
