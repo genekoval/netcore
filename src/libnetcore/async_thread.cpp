@@ -1,7 +1,7 @@
 #include <netcore/async_thread.hpp>
 #include <netcore/runtime.hpp>
 
-#include <fmt/ostream.h>
+#include <fmt/std.h>
 #include <mutex>
 #include <timber/timber>
 
