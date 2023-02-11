@@ -41,7 +41,7 @@ namespace netcore {
                     sock,
                     (sockaddr*) &client_addr,
                     &addrlen,
-                    SOCK_NONBLOCK
+                    SOCK_NONBLOCK | SOCK_CLOEXEC
                 );
 
                 if (client == -1) {

@@ -6,6 +6,7 @@
 #include "fd.h"
 #include "file.hpp"
 #include "mutex.hpp"
+#include "process.hpp"
 #include "runtime.hpp"
 #include "server.h"
 #include "signalfd.h"

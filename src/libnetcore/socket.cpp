@@ -19,7 +19,7 @@ namespace netcore {
     }
 
     socket::socket(int domain, int type, uint32_t events) :
-        socket(::socket(domain, type | SOCK_NONBLOCK, 0), events)
+        socket(::socket(domain, type | SOCK_NONBLOCK | SOCK_CLOEXEC, 0), events)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create socket");

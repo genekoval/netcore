@@ -28,7 +28,7 @@ namespace netcore {
             throw ext::system_error("sigprocmask failure");
         }
 
-        auto fd = ::signalfd(-1, &mask, SFD_NONBLOCK);
+        auto fd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
         if (fd == -1) {
             throw ext::system_error("signalfd create failure");
         }

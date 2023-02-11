@@ -49,7 +49,7 @@ namespace netcore {
     }
 
     timer::timer(int clockid) :
-        descriptor(timerfd_create(clockid, TFD_NONBLOCK)),
+        descriptor(timerfd_create(clockid, TFD_NONBLOCK | TFD_CLOEXEC)),
         event(descriptor, EPOLLIN)
     {
         if (!descriptor.valid()) {

@@ -7,7 +7,7 @@
 
 namespace netcore {
     eventfd::eventfd() :
-        descriptor(::eventfd(0, EFD_NONBLOCK)),
+        descriptor(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)),
         ev(descriptor, EPOLLIN)
     {
         if (!descriptor.valid()) {

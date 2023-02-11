@@ -44,7 +44,7 @@ namespace netcore {
         events(std::make_unique<epoll_event[]>(options.max_events)),
         max_events(options.max_events),
         timeout(options.timeout),
-        descriptor(epoll_create1(0))
+        descriptor(epoll_create1(EPOLL_CLOEXEC))
     {
         if (!descriptor.valid()) {
             throw ext::system_error("epoll create failure");
