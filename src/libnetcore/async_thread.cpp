@@ -98,12 +98,26 @@ namespace netcore {
         auto complete = eventfd();
         auto handle = complete.handle();
 
-        run([](ext::task<>& task, eventfd_handle& handle) -> ext::task<> {
-            co_await task;
+        auto exception = std::exception_ptr();
+
+        run([](
+            ext::task<>& task,
+            eventfd_handle& handle,
+            std::exception_ptr& exception
+        ) -> ext::task<> {
+            try {
+                co_await task;
+            }
+            catch (...) {
+                exception = std::current_exception();
+            }
+
             handle.set();
-        }(t, handle));
+        }(t, handle, exception));
 
         co_await complete.wait();
+
+        if (exception) std::rethrow_exception(exception);
     }
 
     auto async_thread::wait_for_tasks(

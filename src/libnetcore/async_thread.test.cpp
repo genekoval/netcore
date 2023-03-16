@@ -2,6 +2,7 @@
 #include <netcore/async_thread.hpp>
 
 #include <gtest/gtest.h>
+#include <timber/timber>
 
 namespace {
     auto make_thread() -> netcore::async_thread {
@@ -29,5 +30,19 @@ TEST(AsyncThread, Wait) {
         );
 
         EXPECT_EQ(thread.id(), id);
+    }());
+}
+
+TEST(AsyncThread, WaitException) {
+    netcore::run([]() -> ext::task<> {
+        auto thread = make_thread();
+
+        EXPECT_THROW(
+            co_await thread.wait([]() -> ext::task<std::thread::id> {
+                throw std::runtime_error("test error");
+                co_return std::this_thread::get_id();
+            }()),
+            std::runtime_error
+        );
     }());
 }
