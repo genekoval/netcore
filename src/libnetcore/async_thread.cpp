@@ -5,6 +5,8 @@
 #include <mutex>
 #include <timber/timber>
 
+using unique_lock = std::unique_lock<std::mutex>;
+
 namespace netcore {
     async_thread::async_thread(int max_events, std::string_view name) :
         thread(
@@ -15,6 +17,8 @@ namespace netcore {
     {}
 
     auto async_thread::alert() -> void {
+        const auto lock = unique_lock(mutex);
+
         // The thread may still be in the process of starting up.
         // It may not have created a valid event handle yet.
         if (event) event.set();
@@ -48,7 +52,7 @@ namespace netcore {
     }
 
     auto async_thread::pop_task() -> std::optional<ext::task<>> {
-        auto lock = std::unique_lock<std::mutex>(mutex);
+        const auto lock = unique_lock(mutex);
 
         if (tasks.empty()) return {};
 
@@ -59,8 +63,7 @@ namespace netcore {
     }
 
     auto async_thread::push_task(ext::task<>&& task) -> void {
-        auto lock = std::unique_lock<std::mutex>(mutex);
-
+        const auto lock = unique_lock(mutex);
         tasks.emplace(std::forward<ext::task<>>(task));
     }
 
@@ -124,7 +127,11 @@ namespace netcore {
         const std::stop_token& stoken
     ) -> ext::detached_task {
         auto event = eventfd();
-        this->event = event.handle();
+
+        {
+            const auto lock = unique_lock(mutex);
+            this->event = event.handle();
+        }
 
         while (true) {
             run_tasks();
