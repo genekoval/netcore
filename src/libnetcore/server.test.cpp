@@ -24,11 +24,8 @@ namespace {
     };
 
     struct server_context {
-        netcore::event<> closed;
-
         auto close() -> void {
             TIMBER_INFO("Test server closed");
-            closed.emit();
         }
 
         auto connection(netcore::socket&& client) -> ext::task<> {
@@ -48,25 +45,17 @@ namespace {
 }
 
 class ServerTest : public Test {
-    auto close() -> ext::task<> {
-        return server.context.closed.listen();
-    }
-
     auto connect() -> ext::task<netcore::socket> {
         co_return co_await netcore::connect(unix_socket.path.string());
     }
 
-    auto listen() -> ext::detached_task {
-        co_await server.listen(unix_socket);
-    }
-
     auto task(const client_handler auto& handler) -> ext::task<> {
-        listen();
+        auto server_task = server.listen(unix_socket);
 
         co_await handler(co_await connect());
 
         server.close();
-        co_await close();
+        co_await server_task;
     }
 protected:
     netcore::server<server_context> server;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "detail/list.hpp"
+
 #include <netcore/event.hpp>
 #include <netcore/except.hpp>
 #include <netcore/runtime.hpp>
@@ -11,6 +13,28 @@
 #include <filesystem>
 #include <sys/un.h>
 #include <timber/timber>
+
+namespace netcore::detail {
+    class listener : public list<listener> {
+        socket* socket = nullptr;
+    public:
+        listener() = default;
+
+        listener(netcore::socket& socket) : socket(&socket) {}
+
+        template <typename F>
+        requires requires(F f, netcore::socket& socket) { { f(socket) }; }
+        auto for_each(F&& f) -> void {
+            list::for_each([&](listener& listener) {
+                if (listener.socket) f(*listener.socket);
+            });
+        }
+
+        auto notify() -> void {
+            for_each([](netcore::socket& listener) { listener.notify(); });
+        }
+    };
+}
 
 namespace netcore {
     template <typename T>
@@ -28,7 +52,7 @@ namespace netcore {
         event<> no_connections;
         unsigned int connection_count = 0;
         bool close_requested = false;
-        socket* socket_ptr = nullptr;
+        detail::listener listeners;
 
         auto accept(socket& sock) const -> ext::task<int> {
             auto client_addr = sockaddr_storage();
@@ -91,14 +115,17 @@ namespace netcore {
             }
 
             TIMBER_DEBUG("{} listening for connections", sock);
-            socket_ptr = &sock;
+
+            auto listener = detail::listener(sock);
+            listeners.link(listener);
+
             context.listen();
 
             while (true) {
+                int client = -1;
+
                 try {
-                    const auto client = co_await accept(sock);
-                    if (client == -1) break;
-                    handle_connection(client);
+                    client = co_await accept(sock);
                 }
                 catch (const task_canceled&) {
                     break;
@@ -106,9 +133,10 @@ namespace netcore {
                 catch (const ext::system_error& ex) {
                     TIMBER_ERROR(ex.what());
                 }
-            }
 
-            socket_ptr = nullptr;
+                if (client == -1) break;
+                handle_connection(client);
+            }
         }
 
         auto listen_priv(
@@ -163,11 +191,17 @@ namespace netcore {
         template <typename... Args>
         server(Args&&... args) : context(std::forward<Args>(args)...) {}
 
+        server(const server& other) = delete;
+
         server(server&& other) = delete;
+
+        auto operator=(const server& other) -> server& = delete;
+
+        auto operator=(server&& other) -> server& = delete;
 
         auto close() noexcept -> void {
             close_requested = true;
-            if (socket_ptr) socket_ptr->notify();
+            listeners.notify();
         }
 
         auto connections() const noexcept -> unsigned int {
@@ -177,13 +211,13 @@ namespace netcore {
         auto listen(
             const unix_socket& unix_socket,
             int backlog = SOMAXCONN
-        ) -> ext::task<> {
+        ) -> ext::jtask<> {
             co_await listen_priv(unix_socket, backlog);
             co_await wait_for_connections();
         }
 
         auto listening() const noexcept -> bool {
-            return socket_ptr;
+            return !listeners.empty();
         }
     };
 }
