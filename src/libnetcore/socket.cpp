@@ -18,8 +18,12 @@ namespace netcore {
         TIMBER_TRACE("{} created", *this);
     }
 
-    socket::socket(int domain, int type, uint32_t events) :
-        socket(::socket(domain, type | SOCK_NONBLOCK | SOCK_CLOEXEC, 0), events)
+    socket::socket(int domain, int type, int protocol, uint32_t events) :
+        socket(::socket(
+            domain,
+            type | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            protocol
+        ), events)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create socket");

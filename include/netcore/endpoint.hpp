@@ -8,6 +8,11 @@
 #include <variant>
 
 namespace netcore {
+    struct inet_socket {
+        std::string host;
+        std::string port;
+    };
+
     struct unix_socket {
         std::filesystem::path path;
         std::optional<std::filesystem::perms> mode;
@@ -16,4 +21,8 @@ namespace netcore {
 
         auto apply_permissions() const -> void;
     };
+
+    using endpoint = std::variant<inet_socket, unix_socket>;
+
+    auto parse_endpoint(std::string_view string) -> endpoint;
 }

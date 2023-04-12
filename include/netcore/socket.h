@@ -15,7 +15,7 @@ namespace netcore {
     public:
         socket() = default;
         socket(int fd, uint32_t events);
-        socket(int domain, int type, uint32_t events);
+        socket(int domain, int type, int protocol, uint32_t events);
 
         operator int() const;
 

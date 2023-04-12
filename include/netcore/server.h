@@ -1,12 +1,12 @@
 #pragma once
 
-#include "detail/list.hpp"
-
+#include <netcore/address.hpp>
+#include <netcore/detail/list.hpp>
+#include <netcore/endpoint.hpp>
 #include <netcore/event.hpp>
 #include <netcore/except.hpp>
 #include <netcore/runtime.hpp>
 #include <netcore/socket.h>
-#include <netcore/unix_socket.h>
 
 #include <ext/except.h>
 #include <fcntl.h>
@@ -140,10 +140,51 @@ namespace netcore {
         }
 
         auto listen_priv(
+            const inet_socket& inet,
+            int backlog
+        ) -> ext::task<> {
+            auto addr = address(inet.host, inet.port);
+
+            auto sock = socket(
+                addr->ai_family,
+                addr->ai_socktype,
+                addr->ai_protocol,
+                EPOLLIN
+            );
+
+            {
+                int yes = 1;
+                if (setsockopt(
+                    sock,
+                    SOL_SOCKET,
+                    SO_REUSEADDR,
+                    &yes,
+                    sizeof(yes)
+                ) == -1) throw ext::system_error("Failed to set socket option");
+            }
+
+            if (bind(sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+                throw ext::system_error(fmt::format(
+                    "Failed to bind socket to {}:{}",
+                    inet.host,
+                    inet.port
+                ));
+            }
+
+            TIMBER_DEBUG(
+                "{} bound to {}",
+                sock,
+                socket_addr(addr->ai_addr, addr->ai_addrlen)
+            );
+
+            co_await listen(sock, backlog);
+        }
+
+        auto listen_priv(
             const unix_socket& unix_socket,
             int backlog
         ) -> ext::task<> {
-            auto sock = socket(AF_UNIX, SOCK_STREAM, EPOLLIN);
+            auto sock = socket(AF_UNIX, SOCK_STREAM, 0, EPOLLIN);
 
             auto server_address = sockaddr_un();
             server_address.sun_family = AF_UNIX;
@@ -193,11 +234,7 @@ namespace netcore {
 
         server(const server& other) = delete;
 
-        server(server&& other) = delete;
-
         auto operator=(const server& other) -> server& = delete;
-
-        auto operator=(server&& other) -> server& = delete;
 
         auto close() noexcept -> void {
             close_requested = true;
@@ -209,10 +246,12 @@ namespace netcore {
         }
 
         auto listen(
-            const unix_socket& unix_socket,
+            const endpoint& endpoint,
             int backlog = SOMAXCONN
         ) -> ext::jtask<> {
-            co_await listen_priv(unix_socket, backlog);
+            co_await std::visit([&](auto&& arg) {
+                return listen_priv(arg, backlog);
+            }, endpoint);
             co_await wait_for_connections();
         }
 

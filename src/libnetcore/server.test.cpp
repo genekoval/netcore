@@ -18,7 +18,7 @@ namespace {
             std::same_as<ext::task<>>;
     };
 
-    const auto unix_socket = netcore::unix_socket {
+    const netcore::endpoint endpoint = netcore::unix_socket {
         .path = fs::temp_directory_path() / socket_name,
         .mode = fs::perms::owner_read | fs::perms::owner_write
     };
@@ -46,11 +46,11 @@ namespace {
 
 class ServerTest : public Test {
     auto connect() -> ext::task<netcore::socket> {
-        co_return co_await netcore::connect(unix_socket.path.string());
+        co_return co_await netcore::connect(endpoint);
     }
 
     auto task(const client_handler auto& handler) -> ext::task<> {
-        auto server_task = server.listen(unix_socket);
+        auto server_task = server.listen(endpoint);
 
         co_await handler(co_await connect());
 
@@ -68,12 +68,14 @@ protected:
 };
 
 TEST_F(ServerTest, StartStop) {
+    const auto& unix = std::get<netcore::unix_socket>(endpoint);
+
     connect([&](netcore::socket&& client) -> ext::task<> {
-        EXPECT_TRUE(fs::is_socket(unix_socket.path));
+        EXPECT_TRUE(fs::is_socket(unix.path));
         co_return;
     });
 
-    EXPECT_FALSE(fs::exists(unix_socket.path));
+    EXPECT_FALSE(fs::exists(unix.path));
 }
 
 TEST_F(ServerTest, Connection) {

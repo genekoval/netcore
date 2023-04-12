@@ -1,6 +1,5 @@
-#include "address.h"
-
-#include <netcore/client.h>
+#include <netcore/address.hpp>
+#include <netcore/connect.hpp>
 
 #include <cstring>
 #include <ext/except.h>
@@ -16,12 +15,21 @@ namespace netcore {
     ) -> ext::task<socket> {
         auto addr = address(host, port);
 
-        for (auto* res = addr.data(); res != nullptr; res = res->ai_next) {
-            auto sock = socket(res->ai_family, res->ai_socktype, EPOLLOUT);
+        for (auto* res = addr.get(); res != nullptr; res = res->ai_next) {
+            auto sock = socket(
+                res->ai_family,
+                res->ai_socktype,
+                res->ai_protocol,
+                EPOLLOUT
+            );
 
             while (true) {
                 if (::connect(sock, res->ai_addr, res->ai_addrlen) == 0) {
-                    TIMBER_DEBUG("{} connected to {}:{}", sock, host, port);
+                    TIMBER_DEBUG(
+                        "{} connected to {}",
+                        sock,
+                        socket_addr(res->ai_addr, res->ai_addrlen)
+                    );
                     co_return sock;
                 }
 
@@ -42,7 +50,7 @@ namespace netcore {
         addr.sun_family = AF_UNIX;
         path.copy(addr.sun_path, path.size());
 
-        auto sock = socket(AF_UNIX, SOCK_STREAM, EPOLLOUT);
+        auto sock = socket(AF_UNIX, SOCK_STREAM, 0, EPOLLOUT);
 
         while (true) {
             if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) == 0) {
@@ -59,5 +67,19 @@ namespace netcore {
             "Failed to connect to \"{}\"",
             path
         ));
+    }
+
+    auto connect(const endpoint& endpoint) -> ext::task<socket> {
+        return std::visit([](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<T, inet_socket>) {
+                return connect(arg.host, arg.port);
+            }
+
+            if constexpr (std::is_same_v<T, unix_socket>) {
+                return connect(arg.path.native());
+            }
+        }, endpoint);
     }
 }
