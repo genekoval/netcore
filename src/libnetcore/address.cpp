@@ -49,6 +49,23 @@ namespace netcore {
     }
 
     socket_addr::socket_addr(sockaddr* addr, unsigned int addrlen) {
+        switch (addr->sa_family) {
+            case AF_INET:
+                family_ = ip_addr::ipv4;
+                break;
+            case AF_INET6:
+                family_ = ip_addr::ipv6;
+                break;
+            default:
+                throw std::runtime_error(fmt::format(
+                    "unexpected socket address family: {}",
+                    addr->sa_family
+                ));
+        }
+
+        auto host_buffer = std::array<char, NI_MAXHOST>();
+        auto port_buffer = std::array<char, NI_MAXSERV>();
+
         const auto code = getnameinfo(
             addr,
             addrlen,
@@ -59,7 +76,11 @@ namespace netcore {
             NI_NUMERICHOST | NI_NUMERICSERV
         );
 
-        if (code == 0) return;
+        if (code == 0) {
+            host_ = host_buffer.data();
+            port_ = std::stoi(port_buffer.data());
+            return;
+        }
 
         if (code == EAI_SYSTEM) throw ext::system_error(
             "address-to-name translation failure"
@@ -68,11 +89,15 @@ namespace netcore {
         throw std::runtime_error(gai_strerror(code));
     }
 
-    auto socket_addr::host() const noexcept -> std::string_view {
-        return std::string_view(host_buffer.data());
+    auto socket_addr::family() const noexcept -> ip_addr {
+        return family_;
     }
 
-    auto socket_addr::port() const noexcept -> std::string_view {
-        return std::string_view(port_buffer.data());
+    auto socket_addr::host() const noexcept -> std::string_view {
+        return host_;
+    }
+
+    auto socket_addr::port() const noexcept -> unsigned short {
+        return port_;
     }
 }

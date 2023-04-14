@@ -5,6 +5,8 @@
 
 namespace fs = std::filesystem;
 
+using netcore::address_type;
+using netcore::unix_socket;
 using testing::Test;
 
 namespace {
@@ -18,7 +20,7 @@ namespace {
             std::same_as<ext::task<>>;
     };
 
-    const netcore::endpoint endpoint = netcore::unix_socket {
+    const netcore::endpoint endpoint = unix_socket {
         .path = fs::temp_directory_path() / socket_name,
         .mode = fs::perms::owner_read | fs::perms::owner_write
     };
@@ -38,8 +40,11 @@ namespace {
             co_await client.write(&number, sizeof(number_type));
         }
 
-        auto listen() -> void {
-            TIMBER_INFO("Test server listening for connections");
+        auto listen(const address_type& address) -> void {
+            TIMBER_INFO(
+                "Test server listening for connections on {}",
+                address
+            );
         }
     };
 }
@@ -89,4 +94,29 @@ TEST_F(ServerTest, Connection) {
 
         EXPECT_EQ(number + 1, result);
     });
+
+}
+
+TEST_F(ServerTest, ServerInfo) {
+    EXPECT_FALSE(server.listening());
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(server.address()));
+    EXPECT_EQ(0, server.connections());
+
+    connect([&](netcore::socket&& client) -> ext::task<> {
+        EXPECT_TRUE(server.listening());
+
+        EXPECT_TRUE(std::holds_alternative<fs::path>(server.address()));
+        if (const auto* const path = std::get_if<fs::path>(&server.address())) {
+            EXPECT_EQ(std::get<unix_socket>(endpoint).path, *path);
+        }
+
+        co_await netcore::yield();
+        EXPECT_EQ(1, server.connections());
+
+        co_return;
+    });
+
+    EXPECT_FALSE(server.listening());
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(server.address()));
+    EXPECT_EQ(0, server.connections());
 }

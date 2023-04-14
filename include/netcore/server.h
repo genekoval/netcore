@@ -1,7 +1,6 @@
 #pragma once
 
 #include <netcore/address.hpp>
-#include <netcore/detail/list.hpp>
 #include <netcore/endpoint.hpp>
 #include <netcore/event.hpp>
 #include <netcore/except.hpp>
@@ -14,47 +13,42 @@
 #include <sys/un.h>
 #include <timber/timber>
 
-namespace netcore::detail {
-    class listener : public list<listener> {
-        socket* socket = nullptr;
-    public:
-        listener() = default;
-
-        listener(netcore::socket& socket) : socket(&socket) {}
-
-        template <typename F>
-        requires requires(F f, netcore::socket& socket) { { f(socket) }; }
-        auto for_each(F&& f) -> void {
-            list::for_each([&](listener& listener) {
-                if (listener.socket) f(*listener.socket);
-            });
-        }
-
-        auto notify() -> void {
-            for_each([](netcore::socket& listener) { listener.notify(); });
-        }
-    };
-}
-
 namespace netcore {
     template <typename T>
-    concept server_context = requires(T& t, socket&& client) {
+    concept server_context = requires(
+        T& t,
+        socket&& client,
+        const address_type& addr
+    ) {
         { t.close() } -> std::same_as<void>;
 
         { t.connection(std::forward<socket>(client)) } ->
             std::same_as<ext::task<>>;
 
-        { t.listen() } -> std::same_as<void>;
+        { t.listen(addr) } -> std::same_as<void>;
     };
 
     template <server_context T>
-    class server {
+    class server final {
+        class guard final {
+            server* srv;
+        public:
+            guard(server* srv) : srv(srv) {}
+
+            ~guard() {
+                srv->reset();
+            }
+        };
+
+        friend class guard;
+
         event<> no_connections;
         unsigned int connection_count = 0;
         bool close_requested = false;
-        detail::listener listeners;
+        socket* socket = nullptr;
+        address_type addr;
 
-        auto accept(socket& sock) const -> ext::task<int> {
+        auto accept() const -> ext::task<int> {
             auto client_addr = sockaddr_storage();
             socklen_t addrlen = sizeof(client_addr);
 
@@ -62,7 +56,7 @@ namespace netcore {
 
             do {
                 client = ::accept4(
-                    sock,
+                    *socket,
                     (sockaddr*) &client_addr,
                     &addrlen,
                     SOCK_NONBLOCK | SOCK_CLOEXEC
@@ -70,7 +64,7 @@ namespace netcore {
 
                 if (client == -1) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        co_await sock.wait();
+                        co_await socket->wait();
 
                         const auto shutting_down =
                             runtime::current().shutting_down();
@@ -94,7 +88,7 @@ namespace netcore {
             TIMBER_DEBUG("client ({}) connected", client);
 
             try {
-                co_await context.connection(socket(client, EPOLLIN));
+                co_await context.connection(netcore::socket(client, EPOLLIN));
             }
             catch (const std::exception& ex) {
                 TIMBER_ERROR("client connection closed: {}", ex.what());
@@ -107,25 +101,22 @@ namespace netcore {
             if (connection_count == 0) no_connections.emit();
         }
 
-        auto listen(socket& sock, int backlog) -> ext::task<> {
+        auto listen(int backlog) -> ext::task<> {
             close_requested = false;
 
-            if (::listen(sock, backlog) == -1) {
+            if (::listen(*socket, backlog) == -1) {
                 throw ext::system_error("socket listen failure");
             }
 
-            TIMBER_DEBUG("{} listening for connections", sock);
+            TIMBER_DEBUG("{} listening for connections", *socket);
 
-            auto listener = detail::listener(sock);
-            listeners.link(listener);
-
-            context.listen();
+            context.listen(addr);
 
             while (true) {
                 int client = -1;
 
                 try {
-                    client = co_await accept(sock);
+                    client = co_await accept();
                 }
                 catch (const task_canceled&) {
                     break;
@@ -143,14 +134,16 @@ namespace netcore {
             const inet_socket& inet,
             int backlog
         ) -> ext::task<> {
-            auto addr = address(inet.host, inet.port);
+            auto addr = netcore::address(inet.host, inet.port);
 
-            auto sock = socket(
+            auto sock = netcore::socket(
                 addr->ai_family,
                 addr->ai_socktype,
                 addr->ai_protocol,
                 EPOLLIN
             );
+            socket = &sock;
+            this->addr = socket_addr(addr->ai_addr, addr->ai_addrlen);
 
             {
                 int yes = 1;
@@ -174,17 +167,19 @@ namespace netcore {
             TIMBER_DEBUG(
                 "{} bound to {}",
                 sock,
-                socket_addr(addr->ai_addr, addr->ai_addrlen)
+                std::get<socket_addr>(this->addr)
             );
 
-            co_await listen(sock, backlog);
+            co_await listen(backlog);
         }
 
         auto listen_priv(
             const unix_socket& unix_socket,
             int backlog
         ) -> ext::task<> {
-            auto sock = socket(AF_UNIX, SOCK_STREAM, 0, EPOLLIN);
+            auto sock = netcore::socket(AF_UNIX, SOCK_STREAM, 0, EPOLLIN);
+            socket = &sock;
+            addr = unix_socket.path;
 
             auto server_address = sockaddr_un();
             server_address.sun_family = AF_UNIX;
@@ -202,28 +197,26 @@ namespace netcore {
                 ));
             }
 
-            TIMBER_DEBUG("{} bound to path: {}", sock, string);
+            TIMBER_DEBUG(R"({} bound to path: "{}")", sock, string);
 
             unix_socket.apply_permissions();
 
-            co_await listen(sock, backlog);
+            co_await listen(backlog);
 
             if (std::filesystem::remove(unix_socket.path)) {
-                TIMBER_DEBUG("Removed socket file: {}", string);
+                TIMBER_DEBUG(R"(Removed socket file: "{}")", string);
             }
         }
 
+        auto reset() noexcept -> void {
+            addr = std::monostate();
+            close_requested = false;
+            connection_count = 0;
+            socket = nullptr;
+        }
+
         auto wait_for_connections() -> ext::task<> {
-            if (connection_count > 0) {
-                TIMBER_INFO(
-                    "Waiting for {:L} connection{}",
-                    connection_count,
-                    connection_count == 1 ? "" : "s"
-                );
-
-                co_await no_connections.listen();
-            }
-
+            if (connection_count > 0) co_await no_connections.listen();
             context.close();
         }
     public:
@@ -234,11 +227,28 @@ namespace netcore {
 
         server(const server& other) = delete;
 
+        server(server&& other) = delete;
+
         auto operator=(const server& other) -> server& = delete;
+
+        auto operator=(server&& other) -> server& = delete;
+
+        auto address() const noexcept -> const address_type& {
+            return addr;
+        }
 
         auto close() noexcept -> void {
             close_requested = true;
-            listeners.notify();
+            socket->notify();
+
+            if (connection_count > 0) {
+                TIMBER_INFO(
+                    "Waiting for {:L} connection{} on {}",
+                    connection_count,
+                    connection_count == 1 ? "" : "s",
+                    addr
+                );
+            }
         }
 
         auto connections() const noexcept -> unsigned int {
@@ -249,14 +259,17 @@ namespace netcore {
             const endpoint& endpoint,
             int backlog = SOMAXCONN
         ) -> ext::jtask<> {
+            const auto guard = server::guard(this);
+
             co_await std::visit([&](auto&& arg) {
                 return listen_priv(arg, backlog);
             }, endpoint);
+
             co_await wait_for_connections();
         }
 
         auto listening() const noexcept -> bool {
-            return !listeners.empty();
+            return socket != nullptr;
         }
     };
 }
