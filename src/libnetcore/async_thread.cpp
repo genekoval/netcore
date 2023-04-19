@@ -38,12 +38,8 @@ namespace netcore {
             alert();
         });
 
-        auto rt = runtime(runtime_options {
-            .max_events = max_events
-        });
-
+        auto rt = runtime(max_events);
         wait_for_tasks(stoken);
-
         rt.run();
     }
 
@@ -54,7 +50,7 @@ namespace netcore {
     auto async_thread::pop_task() -> std::optional<ext::task<>> {
         const auto lock = unique_lock(mutex);
 
-        if (tasks.empty()) return {};
+        if (tasks.empty()) return std::nullopt;
 
         auto task = std::move(tasks.front());
         tasks.pop();
@@ -72,11 +68,16 @@ namespace netcore {
         alert();
     }
 
-    auto async_thread::run_task(ext::task<>&& task) -> ext::detached_task {
-        const auto t = std::forward<ext::task<>>(task);
+    auto async_thread::run_task(
+        ext::task<> task,
+        const std::stop_token& stoken
+    ) -> ext::detached_task {
+        ++task_count;
 
         try {
-            co_await t;
+            TIMBER_DEBUG("Starting task");
+            co_await std::move(task);
+            TIMBER_DEBUG("Task complete");
         }
         catch (const std::exception& ex) {
             TIMBER_ERROR("error occurred in task: {}", ex.what());
@@ -84,43 +85,18 @@ namespace netcore {
         catch (...) {
             TIMBER_ERROR("unknown error occurred in task");
         }
+
+        --task_count;
+        if (stoken.stop_requested() && task_count == 0) event.set();
     }
 
-    auto async_thread::run_tasks() -> void {
+    auto async_thread::run_tasks(const std::stop_token& stoken) -> void {
         while (true) {
             auto task = pop_task();
             if (!task) break;
 
-            run_task(std::move(*task));
+            run_task(std::move(*task), stoken);
         }
-    }
-
-    auto async_thread::wait(ext::task<>&& task) -> ext::task<> {
-        auto t = std::forward<ext::task<>>(task);
-
-        auto complete = eventfd();
-        auto handle = complete.handle();
-
-        auto exception = std::exception_ptr();
-
-        run([](
-            ext::task<>& task,
-            eventfd_handle& handle,
-            std::exception_ptr& exception
-        ) -> ext::task<> {
-            try {
-                co_await task;
-            }
-            catch (...) {
-                exception = std::current_exception();
-            }
-
-            handle.set();
-        }(t, handle, exception));
-
-        co_await complete.wait();
-
-        if (exception) std::rethrow_exception(exception);
     }
 
     auto async_thread::wait_for_tasks(
@@ -133,12 +109,13 @@ namespace netcore {
             this->event = event.handle();
         }
 
+        TIMBER_TRACE("Entering task loop");
+
         while (true) {
-            run_tasks();
+            run_tasks(stoken);
 
             if (stoken.stop_requested()) {
                 TIMBER_DEBUG("Thread stop request received");
-                runtime::current().stop();
                 break;
             }
 
@@ -146,5 +123,15 @@ namespace netcore {
         }
 
         TIMBER_TRACE("Exiting task loop");
+
+        if (task_count > 0) {
+            TIMBER_DEBUG(
+                "Waiting for {:L} unfinished task{}",
+                task_count,
+                task_count == 1 ? "" : "s"
+            );
+
+            co_await event.wait();
+        }
     }
 }

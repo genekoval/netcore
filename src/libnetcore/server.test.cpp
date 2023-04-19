@@ -56,6 +56,7 @@ class ServerTest : public Test {
 
     auto task(const client_handler auto& handler) -> ext::task<> {
         auto server_task = server.listen(endpoint);
+        if (server_task.is_ready()) co_await server_task;
 
         co_await handler(co_await connect());
 

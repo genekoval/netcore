@@ -33,14 +33,14 @@ namespace netcore {
             throw ext::system_error("signalfd create failure");
         }
 
-        return {fd};
+        return signalfd(fd);
     }
 
     auto signalfd::read(
         void* buffer,
         std::size_t len
     ) -> ext::task<void> {
-        auto total = std::size_t(0);
+        std::size_t total = 0;
 
         do {
             const auto bytes = ::read(descriptor, buffer, len);
@@ -59,22 +59,12 @@ namespace netcore {
         while (total < len);
     }
 
-    auto signalfd::wait_for_signal() noexcept -> ext::task<int> {
+    auto signalfd::wait_for_signal() -> ext::task<int> {
         constexpr auto infolen = sizeof(signalfd_siginfo);
 
         auto info = signalfd_siginfo();
+        co_await read(&info, infolen);
 
-        try {
-            co_await read(&info, infolen);
-            co_return info.ssi_signo;
-        }
-        catch (const task_canceled&) {
-            co_return 0;
-        }
-        catch (const std::exception& ex) {
-            TIMBER_ERROR("waiting for signal has failed: {}", ex.what());
-        }
-
-        co_return -1;
+        co_return info.ssi_signo;
     }
 }

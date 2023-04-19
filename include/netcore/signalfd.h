@@ -10,7 +10,7 @@ namespace netcore {
         const fd descriptor;
         system_event event;
 
-        signalfd(int descriptor);
+        explicit signalfd(int descriptor);
 
         auto read(void* buffer, std::size_t len) -> ext::task<void>;
     public:
@@ -18,6 +18,6 @@ namespace netcore {
 
         operator int() const;
 
-        auto wait_for_signal() noexcept -> ext::task<int>;
+        auto wait_for_signal() -> ext::task<int>;
     };
 }

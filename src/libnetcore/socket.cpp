@@ -36,10 +36,6 @@ namespace netcore {
         event.cancel();
     }
 
-    auto socket::deregister() -> void {
-        event.deregister();
-    }
-
     auto socket::end() const -> void {
         if (::shutdown(descriptor, SHUT_WR) == -1) {
             throw ext::system_error("failed to shutdown further transmissions");
@@ -74,10 +70,6 @@ namespace netcore {
         TIMBER_DEBUG("{} recv {} bytes", *this, bytes);
 
         co_return bytes;
-    }
-
-    auto socket::register_scoped() -> register_guard {
-        return event.register_scoped();
     }
 
     auto socket::sendfile(

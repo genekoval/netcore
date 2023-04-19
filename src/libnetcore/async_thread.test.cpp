@@ -1,5 +1,5 @@
-#include <netcore/async.hpp>
 #include <netcore/async_thread.hpp>
+#include <netcore/runtime.hpp>
 
 #include <gtest/gtest.h>
 #include <timber/timber>

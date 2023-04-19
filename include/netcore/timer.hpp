@@ -42,6 +42,28 @@ namespace netcore {
 
         auto wait() -> ext::task<std::uint64_t>;
     };
+
+    template <typename Rep, typename Period>
+    auto sleep_for(
+        const std::chrono::duration<Rep, Period>& duration
+    ) -> ext::task<> {
+        auto timer = netcore::timer::monotonic();
+        timer.set(duration);
+
+        co_await timer.wait();
+    }
+
+    template <typename Clock, typename Duration>
+    auto sleep_until(
+        const std::chrono::time_point<Clock, Duration>& sleep_time
+    ) -> ext::task<> {
+        const auto duration = sleep_time - Clock::now();
+
+        auto timer = netcore::timer::realtime();
+        timer.set(duration);
+
+        co_await timer.wait();
+    }
 }
 
 namespace fmt {

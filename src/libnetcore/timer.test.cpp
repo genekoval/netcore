@@ -1,6 +1,6 @@
-#include <netcore/async.hpp>
 #include <netcore/event.hpp>
 #include <netcore/except.hpp>
+#include <netcore/runtime.hpp>
 #include <netcore/timer.hpp>
 
 #include <gtest/gtest.h>
@@ -76,5 +76,22 @@ TEST(Timer, Disarm) {
 
         EXPECT_LT(elapsed, time);
         EXPECT_TRUE(canceled);
+    }());
+}
+
+TEST(Timer, MultipleAwaiters) {
+    netcore::run([]() -> ext::task<> {
+        auto timer = netcore::timer::monotonic();
+        const auto wait = [&]() -> ext::jtask<> {
+            co_await timer.wait();
+        };
+
+        timer.set(50ms);
+
+        const auto t1 = wait();
+        const auto t2 = wait();
+
+        co_await t1;
+        co_await t2;
     }());
 }

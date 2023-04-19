@@ -21,8 +21,6 @@ namespace netcore {
 
         auto cancel() noexcept -> void;
 
-        auto deregister() -> void;
-
         auto end() const -> void;
 
         auto notify() -> void;
@@ -31,8 +29,6 @@ namespace netcore {
             void* buffer,
             std::size_t len
         ) -> ext::task<std::size_t>;
-
-        auto register_scoped() -> register_guard;
 
         auto sendfile(
             const fd& descriptor,

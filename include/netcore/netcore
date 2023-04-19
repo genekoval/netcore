@@ -1,4 +1,3 @@
-#include "async.hpp"
 #include "async_thread.hpp"
 #include "client.hpp"
 #include "connect.hpp"
@@ -14,5 +13,6 @@
 #include "signalfd.h"
 #include "socket.h"
 #include "thread_pool.h"
+#include "timer.hpp"
 
 // vim: ft=cpp

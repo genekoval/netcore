@@ -7,43 +7,16 @@
 
 namespace netcore {
     class runtime;
-    class system_event;
-
-    class [[nodiscard]] register_guard {
-        friend class system_event;
-
-        system_event& notif;
-
-        explicit register_guard(system_event& event);
-    public:
-        ~register_guard();
-    };
 
     class system_event {
         friend class runtime;
 
         int fd = -1;
         uint32_t events = 0;
-        system_event* head = this;
-        system_event* tail = this;
+        bool registered = false;
         detail::awaiter_queue awaiters;
-        runtime* last_runtime = nullptr;
-
-        auto append(system_event& other) noexcept -> void;
-
-        auto empty() const noexcept -> bool;
-
-        auto one_or_empty() const noexcept -> bool;
-
-        auto register_unscoped() -> void;
 
         auto resume() -> void;
-
-        auto set_events(uint32_t events) -> void;
-
-        auto unlink() noexcept -> void;
-
-        auto update() -> void;
     public:
         system_event() = default;
 
@@ -53,15 +26,11 @@ namespace netcore {
 
         system_event(system_event&& other);
 
-        ~system_event();
-
         auto operator=(const system_event&) -> system_event& = delete;
 
         auto operator=(system_event&&) -> system_event&;
 
         auto cancel() -> void;
-
-        auto deregister() -> void;
 
         auto error(std::exception_ptr ex) noexcept -> void;
 
@@ -74,8 +43,6 @@ namespace netcore {
             awaiters.assign(state);
             notify();
         }
-
-        auto register_scoped() -> register_guard;
 
         auto wait(uint32_t events, void* state) -> ext::task<detail::awaiter*>;
     };

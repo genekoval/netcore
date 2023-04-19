@@ -4,85 +4,74 @@
 #include "system_event.hpp"
 
 #include <chrono>
+#include <ext/except.h>
 #include <memory>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <timber/timber>
 
 namespace netcore {
-    struct runtime_options {
-        int max_events = SOMAXCONN;
-        std::chrono::seconds timeout = std::chrono::seconds::zero();
-    };
-
-    enum class runtime_status : uint8_t {
-        stopped,
-        running,
-        graceful_shutdown,
-        force_shutdown
-    };
-
     class runtime {
         const std::unique_ptr<epoll_event[]> events;
         const int max_events;
-        const std::chrono::milliseconds timeout;
 
-        system_event system_events;
         detail::awaiter_queue pending;
-        runtime_status stat = runtime_status::stopped;
-
-        auto cancel() -> void;
-
-        auto notify() -> void;
-
-        auto resume_all() -> void;
-
-        /**
-         * Perform either a normal or EOL (end of life) run.
-         */
-        auto run(bool eol) -> void;
-
-        auto run_main_task(
-            ext::task<>&& task,
-            std::exception_ptr& exception
-        ) -> ext::detached_task;
+        std::size_t system_events = 0;
     public:
+        static auto active() -> bool;
+
         static auto current() -> runtime&;
 
         const fd descriptor;
 
-        /**
-         * Creates a runtime with the following default options:
-         * - Max Events: SOMAXCONN
-         * - Timeout: 0 seconds
-         */
-        runtime();
-
-        runtime(const runtime_options& options);
+        runtime(int max_events = SOMAXCONN);
 
         ~runtime();
 
-        auto add(system_event& system_event) -> void;
-
-        auto one_or_empty() const noexcept -> bool;
-
-        auto remove(system_event& system_event) -> void;
+        auto add(system_event* system_event) -> void;
 
         auto run() -> void;
-
-        auto run(ext::task<>&& task) -> void;
-
-        auto shutting_down() const noexcept -> bool;
-
-        auto shutdown() noexcept -> void;
-
-        auto status() const noexcept -> runtime_status;
-
-        auto stop() noexcept -> void;
-
-        auto update(system_event& system_event) -> void;
 
         auto enqueue(detail::awaiter& a) -> void;
 
         auto enqueue(detail::awaiter_queue& awaiters) -> void;
+
+        auto remove(system_event* system_event) -> void;
     };
+
+    auto run() -> void;
+
+    template <typename R>
+    auto run(ext::task<R>&& task) -> R {
+        auto wrapper = [](ext::task<R>&& task) -> ext::jtask<R> {
+            co_return co_await std::move(task);
+        };
+
+        auto wrapper_task = ext::jtask<>();
+
+        if (runtime::active()) {
+            wrapper_task = wrapper(std::forward<ext::task<R>>(task));
+            runtime::current().run();
+        }
+        else {
+            auto runtime = netcore::runtime();
+            wrapper_task = wrapper(std::forward<ext::task<R>>(task));
+            runtime.run();
+        }
+
+        return std::move(wrapper_task).result();
+    }
+
+    auto yield() -> ext::task<>;
 }
+
+template <>
+struct fmt::formatter<netcore::runtime> {
+    constexpr auto parse(auto& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const netcore::runtime& runtime, auto& ctx) {
+        return format_to(ctx.out(), "runtime ({})", runtime.descriptor);
+    }
+};

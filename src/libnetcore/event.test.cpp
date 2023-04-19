@@ -1,5 +1,5 @@
-#include <netcore/async.hpp>
 #include <netcore/event.hpp>
+#include <netcore/runtime.hpp>
 
 #include <gtest/gtest.h>
 

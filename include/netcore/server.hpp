@@ -52,34 +52,26 @@ namespace netcore {
             auto client_addr = sockaddr_storage();
             socklen_t addrlen = sizeof(client_addr);
 
-            auto client = -1;
-
-            do {
-                client = ::accept4(
+            while (true) {
+                const auto client = ::accept4(
                     *socket,
                     (sockaddr*) &client_addr,
                     &addrlen,
                     SOCK_NONBLOCK | SOCK_CLOEXEC
                 );
 
-                if (client == -1) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        co_await socket->wait();
+                if (client != -1) co_return client;
 
-                        const auto shutting_down =
-                            runtime::current().shutting_down();
-
-                        if (shutting_down || close_requested) break;
-                    }
-                    else {
-                        throw ext::system_error(
-                            "failed to accept client connection"
-                        );
-                    }
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await socket->wait();
+                    if (close_requested) co_return -1;
                 }
-            } while (client == -1);
-
-            co_return client;
+                else {
+                    throw ext::system_error(
+                        "failed to accept client connection"
+                    );
+                }
+            };
         }
 
         auto handle_connection(int client) -> ext::detached_task {
@@ -128,6 +120,8 @@ namespace netcore {
                 if (client == -1) break;
                 handle_connection(client);
             }
+
+            socket = nullptr;
         }
 
         auto listen_priv(
@@ -238,8 +232,10 @@ namespace netcore {
         }
 
         auto close() noexcept -> void {
-            close_requested = true;
-            socket->notify();
+            if (listening()) {
+                close_requested = true;
+                socket->notify();
+            }
 
             if (connection_count > 0) {
                 TIMBER_INFO(

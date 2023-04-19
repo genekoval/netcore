@@ -64,7 +64,7 @@ namespace netcore::detail {
         auto size() -> std::size_t;
     };
 
-    class awaitable final {
+    class awaitable {
         awaiter a;
         awaiter_queue& awaiters;
     public:

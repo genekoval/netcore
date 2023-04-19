@@ -114,12 +114,6 @@ namespace netcore::detail {
     }
 
     auto awaitable::await_suspend(std::coroutine_handle<> coroutine) -> void {
-        const auto status = runtime::current().status();
-
-        if (status == runtime_status::force_shutdown) {
-            throw task_canceled();
-        }
-
         a.coroutine = coroutine;
         awaiters.enqueue(a);
     }
