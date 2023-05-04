@@ -4,7 +4,6 @@
 #include "endpoint.hpp"
 #include "eventfd.h"
 #include "except.hpp"
-#include "fd.h"
 #include "file.hpp"
 #include "mutex.hpp"
 #include "process.hpp"

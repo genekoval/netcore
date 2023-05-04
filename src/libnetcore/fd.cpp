@@ -1,4 +1,4 @@
-#include <netcore/fd.h>
+#include <netcore/fd.hpp>
 
 #include <cstring>
 #include <ext/except.h>
@@ -28,14 +28,16 @@ namespace netcore {
     fd::operator int() const { return descriptor; }
 
     auto fd::operator=(fd&& other) noexcept -> fd& {
-        descriptor = std::exchange(other.descriptor, invalid);
+        std::destroy_at(this);
+        std::construct_at(this, std::forward<fd>(other));
         return *this;
     }
 
     auto fd::close() noexcept -> void {
         if (::close(descriptor) == -1) {
             TIMBER_ERROR(
-                "failed to close file descriptor: {}",
+                "Failed to close file descriptor ({}): {}",
+                descriptor,
                 std::strerror(errno)
             );
         }
@@ -44,23 +46,6 @@ namespace netcore {
         }
 
         descriptor = invalid;
-    }
-
-    auto fd::flags() const -> int {
-        auto fl = fcntl(descriptor, F_GETFL, 0);
-        if (fl == -1) {
-            throw ext::system_error("failed to get socket flags");
-        }
-
-        return fl;
-    }
-
-    auto fd::flags(int flags) const -> void {
-        auto fl = this->flags() | flags;
-
-        if (fcntl(descriptor, F_SETFL, fl) == -1) {
-            throw ext::system_error("failed to set socket flags");
-        }
     }
 
     auto fd::valid() const -> bool { return descriptor != invalid; }

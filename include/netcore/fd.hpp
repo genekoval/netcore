@@ -19,10 +19,6 @@ namespace netcore {
         auto operator=(const fd&) -> fd& = delete;
         auto operator=(fd&& other) noexcept -> fd&;
 
-        auto flags() const -> int;
-
-        auto flags(int flags) const -> void;
-
         auto valid() const -> bool;
     };
 }
