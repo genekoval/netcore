@@ -44,6 +44,10 @@ namespace netcore {
             notify();
         }
 
+        auto read(void* buffer, std::size_t len) -> ext::task<std::size_t>;
+
         auto wait(uint32_t events, void* state) -> ext::task<detail::awaiter*>;
+
+        auto write(const void* data, std::size_t len) -> ext::task<std::size_t>;
     };
 }

@@ -3,8 +3,6 @@
 namespace netcore {
     class fd {
         int descriptor;
-
-        auto close() noexcept -> void;
     public:
         fd();
         fd(int descriptor);
@@ -19,6 +17,12 @@ namespace netcore {
         auto operator=(const fd&) -> fd& = delete;
         auto operator=(fd&& other) noexcept -> fd&;
 
+        auto close() noexcept -> void;
+
+        auto release() noexcept -> int;
+
         auto valid() const -> bool;
     };
+
+    auto close(int fd) noexcept -> void;
 }

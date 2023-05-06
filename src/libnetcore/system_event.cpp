@@ -52,6 +52,36 @@ namespace netcore {
         runtime::current().enqueue(awaiters);
     }
 
+    auto system_event::read(
+        void* buffer,
+        std::size_t len
+    ) -> ext::task<std::size_t> {
+        auto bytes = -1;
+
+        do {
+            bytes = ::read(fd, buffer, len);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await wait(EPOLLIN, nullptr);
+                }
+                else {
+                    TIMBER_DEBUG("fd ({}) failed to read data", fd);
+                    throw ext::system_error("Failed to read data");
+                }
+            }
+        } while (bytes == -1);
+
+        TIMBER_TRACE(
+            "fd ({}) read {:L} byte{}",
+            fd,
+            bytes,
+            bytes == 1 ? "" : "s"
+        );
+
+        co_return bytes;
+    }
+
     auto system_event::resume() -> void {
         awaiters.resume();
     }
@@ -87,5 +117,35 @@ namespace netcore {
 
         if (events != 0) this->events = events | permanent_events;
         co_return co_await awaitable(this, state);
+    }
+
+    auto system_event::write(
+        const void* data,
+        std::size_t len
+    ) -> ext::task<std::size_t> {
+        auto bytes = -1;
+
+        do {
+            bytes = ::write(fd, data, len);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await wait(EPOLLOUT, nullptr);
+                }
+                else {
+                    TIMBER_DEBUG("fd ({}) failed to write data", fd);
+                    throw ext::system_error("Failed to write data");
+                }
+            }
+        } while (bytes == 1);
+
+        TIMBER_TRACE(
+            "fd ({}) write {:L} byte{}",
+            fd,
+            bytes,
+            bytes == 1 ? "" : "s"
+        );
+
+        co_return bytes;
     }
 }

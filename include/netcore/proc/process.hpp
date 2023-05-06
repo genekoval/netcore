@@ -1,9 +1,9 @@
 #pragma once
 
-#include "fd.hpp"
-#include "system_event.hpp"
+#include <netcore/fd.hpp>
+#include <netcore/system_event.hpp>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <optional>
 #include <sys/wait.h>
 
@@ -18,6 +18,8 @@ namespace netcore::proc {
         continued = CLD_CONTINUED
     };
 
+    auto to_string(code code) -> std::string_view;
+
     struct state {
         code code;
         int status;
@@ -30,9 +32,9 @@ namespace netcore::proc {
         fd descriptor;
         system_event event;
     public:
-        process(pid_t pid);
-
         process() = default;
+
+        explicit process(pid_t pid);
 
         explicit operator bool() const noexcept;
 
@@ -45,6 +47,37 @@ namespace netcore::proc {
 
     auto fork() -> process;
 }
+
+template <>
+struct fmt::formatter<netcore::proc::state> : formatter<std::string_view> {
+    template <typename FormatContext>
+    auto format(netcore::proc::state state, FormatContext& ctx) {
+        using netcore::proc::code;
+
+        auto buffer = memory_buffer();
+        auto it = std::back_inserter(buffer);
+
+        switch (state.code) {
+            case code::none: format_to(it, "{}", "<no return state>"); break;
+            case code::exited:
+                format_to(it, "exited with code {}", state.status);
+                break;
+            default:
+                format_to(
+                    it,
+                    "{} by signal {}",
+                    netcore::proc::to_string(state.code),
+                    state.status
+                );
+                break;
+        }
+
+        return formatter<std::string_view>::format(
+            {buffer.data(), buffer.size()},
+            ctx
+        );
+    }
+};
 
 template <>
 struct fmt::formatter<netcore::proc::process> {

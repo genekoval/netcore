@@ -1,4 +1,4 @@
-#include <netcore/process.hpp>
+#include <netcore/proc/process.hpp>
 
 #include <ext/except.h>
 #include <linux/pidfd.h>
@@ -8,10 +8,10 @@
 #include <unistd.h>
 
 namespace {
-    auto get_state(int state) -> netcore::proc::code {
+    auto to_code(int n) -> netcore::proc::code {
         using enum netcore::proc::code;
 
-        switch (state) {
+        switch (n) {
             case CLD_EXITED: return exited;
             case CLD_KILLED: return killed;
             case CLD_DUMPED: return dumped;
@@ -19,13 +19,25 @@ namespace {
             case CLD_STOPPED: return stopped;
             case CLD_CONTINUED: return continued;
             default:
-                TIMBER_WARNING("Unknown process state code: {}", state);
+                TIMBER_WARNING("Unknown process state code: {}", n);
                 return none;
         }
     }
 }
 
 namespace netcore::proc {
+    auto to_string(code code) -> std::string_view {
+        switch (code) {
+            case code::none: return "<none>";
+            case code::exited: return "exited";
+            case code::killed: return "killed";
+            case code::dumped: return "dumped";
+            case code::trapped: return "trapped";
+            case code::stopped: return "stopped";
+            case code::continued: return "continued";
+        }
+    }
+
     process::process(pid_t pid) :
         id(pid),
         descriptor(syscall(SYS_pidfd_open, id, PIDFD_NONBLOCK)),
@@ -46,7 +58,7 @@ namespace netcore::proc {
         const auto* str = strsignal(signal);
 
         TIMBER_DEBUG(
-            "sending signal ({}: {}) to process with PID {}",
+            "Sending signal ({}: {}) to process with PID {}",
             signal,
             str ? str : "invalid signal",
             id
@@ -71,22 +83,22 @@ namespace netcore::proc {
 
         do {
             if (waitid(P_PIDFD, descriptor, &siginfo, states) == -1) {
-                if (errno == EAGAIN) {
-                    co_await event.wait(0, nullptr);
-                }
-                else {
-                    throw ext::system_error(fmt::format(
-                        "failed to wait for process with pid {}",
-                        id
-                    ));
-                }
+                if (errno == EAGAIN) co_await event.wait(0, nullptr);
+                else throw ext::system_error(fmt::format(
+                    "failed to wait for process with PID {}",
+                    id
+                ));
             }
         } while (siginfo.si_pid == 0);
 
-        co_return state {
-            .code = get_state(siginfo.si_code),
+        auto result = state {
+            .code = to_code(siginfo.si_code),
             .status = siginfo.si_status
         };
+
+        TIMBER_DEBUG("{} {}", *this, result);
+
+        co_return result;
     }
 
     auto fork() -> process {

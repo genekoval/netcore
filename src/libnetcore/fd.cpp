@@ -34,19 +34,26 @@ namespace netcore {
     }
 
     auto fd::close() noexcept -> void {
-        if (::close(descriptor) == -1) {
+        netcore::close(descriptor);
+        descriptor = invalid;
+    }
+
+    auto fd::release() noexcept -> int {
+        return std::exchange(descriptor, invalid);
+    }
+
+    auto fd::valid() const -> bool { return descriptor != invalid; }
+
+    auto close(int fd) noexcept -> void {
+        if (::close(fd) == -1) {
             TIMBER_ERROR(
                 "Failed to close file descriptor ({}): {}",
-                descriptor,
+                fd,
                 std::strerror(errno)
             );
         }
         else {
-            TIMBER_TRACE("fd ({}) closed", descriptor);
+            TIMBER_TRACE("fd ({}) closed", fd);
         }
-
-        descriptor = invalid;
     }
-
-    auto fd::valid() const -> bool { return descriptor != invalid; }
 }
