@@ -28,6 +28,11 @@ namespace netcore {
         { t.listen(addr) } -> std::same_as<void>;
     };
 
+    template <typename T>
+    concept server_context_backlog = requires(T t) {
+        { t.backlog } -> std::convertible_to<int>;
+    };
+
     template <server_context T>
     class server final {
         class guard final {
@@ -93,7 +98,10 @@ namespace netcore {
             if (connection_count == 0) no_connections.emit();
         }
 
-        auto listen(int backlog) -> ext::task<> {
+        auto listen() -> ext::task<> {
+            auto backlog = SOMAXCONN;
+            if constexpr (server_context_backlog<T>) backlog = context.backlog;
+
             close_requested = false;
 
             if (::listen(*socket, backlog) == -1) {
@@ -124,10 +132,7 @@ namespace netcore {
             socket = nullptr;
         }
 
-        auto listen_priv(
-            const inet_socket& inet,
-            int backlog
-        ) -> ext::task<> {
+        auto listen_priv(const inet_socket& inet) -> ext::task<> {
             auto addr = netcore::address(inet.host, inet.port);
 
             auto sock = netcore::socket(
@@ -164,13 +169,10 @@ namespace netcore {
                 std::get<socket_addr>(this->addr)
             );
 
-            co_await listen(backlog);
+            co_await listen();
         }
 
-        auto listen_priv(
-            const unix_socket& unix_socket,
-            int backlog
-        ) -> ext::task<> {
+        auto listen_priv(const unix_socket& unix_socket) -> ext::task<> {
             auto sock = netcore::socket(AF_UNIX, SOCK_STREAM, 0, EPOLLIN);
             socket = &sock;
             addr = unix_socket.path;
@@ -195,7 +197,7 @@ namespace netcore {
 
             unix_socket.apply_permissions();
 
-            co_await listen(backlog);
+            co_await listen();
 
             if (std::filesystem::remove(unix_socket.path)) {
                 TIMBER_DEBUG(R"(Removed socket file: "{}")", string);
@@ -251,14 +253,11 @@ namespace netcore {
             return connection_count;
         }
 
-        auto listen(
-            const endpoint& endpoint,
-            int backlog = SOMAXCONN
-        ) -> ext::jtask<> {
+        auto listen(const endpoint& endpoint) -> ext::jtask<> {
             const auto guard = server::guard(this);
 
             co_await std::visit([&](auto&& arg) {
-                return listen_priv(arg, backlog);
+                return listen_priv(arg);
             }, endpoint);
 
             co_await wait_for_connections();
