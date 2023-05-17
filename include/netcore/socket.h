@@ -11,7 +11,11 @@
 namespace netcore {
     class socket {
         fd descriptor;
+        bool error = false;
         system_event event;
+
+        [[noreturn]]
+        auto failure(const char* message) -> void;
     public:
         socket() = default;
         socket(int fd, uint32_t events);
@@ -23,10 +27,12 @@ namespace netcore {
 
         auto end() const -> void;
 
+        auto failed() const noexcept -> bool;
+
         auto notify() -> void;
 
         auto read(
-            void* buffer,
+            void* dest,
             std::size_t len
         ) -> ext::task<std::size_t>;
 
@@ -35,12 +41,14 @@ namespace netcore {
             std::size_t count
         ) -> ext::task<>;
 
+        auto try_read(void* dest, std::size_t len) -> long;
+
         auto valid() const -> bool;
 
         auto wait(uint32_t events = 0) -> ext::task<>;
 
         auto write(
-            const void* data,
+            const void* src,
             std::size_t len
         ) -> ext::task<std::size_t>;
     };

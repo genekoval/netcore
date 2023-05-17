@@ -44,32 +44,39 @@ namespace netcore {
         TIMBER_DEBUG("{} shutdown transmissions", *this);
     }
 
+    auto socket::failed() const noexcept -> bool {
+        return error;
+    }
+
+    auto socket::failure(const char* message) -> void {
+        error = true;
+        TIMBER_DEBUG("{} {}", *this, message);
+        throw ext::system_error(message);
+    }
+
     auto socket::notify() -> void {
         event.notify();
     }
 
     auto socket::read(
-        void* buffer,
+        void* dest,
         std::size_t len
     ) -> ext::task<std::size_t> {
-        auto bytes = -1;
+        auto bytes_read = -1;
 
         do {
-            bytes = ::recv(descriptor, buffer, len, 0);
+            bytes_read = try_read(dest, len);
+            if (bytes_read == -1) co_await wait(EPOLLIN);
+        } while (bytes_read == -1);
 
-            if (bytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await wait(EPOLLIN);
-                    continue;
-                }
+        TIMBER_TRACE(
+            "{} recv {:L} byte{}",
+            *this,
+            bytes_read,
+            bytes_read == 1 ? "" : "s"
+        );
 
-                throw ext::system_error("failed to receive data");
-            }
-        } while (bytes == -1);
-
-        TIMBER_DEBUG("{} recv {} bytes", *this, bytes);
-
-        co_return bytes;
+        co_return bytes_read;
     }
 
     auto socket::sendfile(
@@ -93,7 +100,7 @@ namespace netcore {
                     continue;
                 }
 
-                throw ext::system_error("sendfile failure");
+                failure("sendfile failure");
             }
 
             sent += bytes;
@@ -104,6 +111,16 @@ namespace netcore {
         }
     }
 
+    auto socket::try_read(void* dest, std::size_t len) -> long {
+        const auto bytes_read = ::recv(descriptor, dest, len, 0);
+
+        if (bytes_read == -1 && (errno != EAGAIN && errno != EWOULDBLOCK)) {
+            failure("failed to receive data");
+        }
+
+        return bytes_read;
+    }
+
     auto socket::valid() const -> bool { return descriptor.valid(); }
 
     auto socket::wait(uint32_t events) -> ext::task<> {
@@ -111,27 +128,31 @@ namespace netcore {
     }
 
     auto socket::write(
-        const void* data,
+        const void* src,
         std::size_t len
     ) -> ext::task<std::size_t> {
-        auto bytes = -1;
+        auto bytes_written = -1;
 
         do {
-            bytes = ::send(descriptor, data, len, MSG_NOSIGNAL);
+            bytes_written = ::send(descriptor, src, len, MSG_NOSIGNAL);
 
-            if (bytes == -1) {
+            if (bytes_written == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     co_await wait(EPOLLOUT);
                     continue;
                 }
 
-                TIMBER_DEBUG("{} failed to send data", *this);
-                throw ext::system_error("failed to send data");
+                failure("failed to send data");
             }
-        } while (bytes == -1);
+        } while (bytes_written == -1);
 
-        TIMBER_DEBUG("{} send {} bytes", *this, bytes);
+        TIMBER_TRACE(
+            "{} send {:L} byte{}",
+            *this,
+            bytes_written,
+            bytes_written == 1 ? "" : "s"
+        );
 
-        co_return bytes;
+        co_return bytes_written;
     }
 }
