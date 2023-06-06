@@ -64,6 +64,10 @@ namespace netcore {
         return writer.flush();
     }
 
+    auto buffered_socket::read() -> ext::task<std::span<const std::byte>> {
+        return reader.read();
+    }
+
     auto buffered_socket::read(
         std::size_t len
     ) -> ext::task<std::span<const std::byte>> {

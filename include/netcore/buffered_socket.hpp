@@ -38,6 +38,8 @@ namespace netcore {
 
         auto flush() -> ext::task<>;
 
+        auto read() -> ext::task<std::span<const std::byte>>;
+
         auto read(std::size_t len) -> ext::task<std::span<const std::byte>>;
 
         auto read(void* dest, std::size_t len) -> ext::task<>;

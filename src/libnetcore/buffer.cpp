@@ -59,6 +59,12 @@ namespace netcore {
         return available() == 0;
     }
 
+    auto buffer::read() -> std::span<const std::byte> {
+        auto result = data();
+        consume(size());
+        return result;
+    }
+
     auto buffer::read(std::size_t len) -> std::span<const std::byte> {
         len = std::min(size(), len);
         auto result = std::span<const std::byte>(front(), len);

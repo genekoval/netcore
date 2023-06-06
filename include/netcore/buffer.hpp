@@ -42,6 +42,8 @@ namespace netcore {
 
         auto full() const noexcept -> bool;
 
+        auto read() -> std::span<const std::byte>;
+
         auto read(std::size_t len) -> std::span<const std::byte>;
 
         auto read(void* dest, std::size_t len) -> std::size_t;
