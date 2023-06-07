@@ -41,6 +41,8 @@ namespace netcore {
             std::size_t count
         ) -> ext::task<>;
 
+        auto take() -> fd;
+
         auto try_read(void* dest, std::size_t len) -> long;
 
         auto valid() const -> bool;

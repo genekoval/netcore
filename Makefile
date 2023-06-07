@@ -11,7 +11,7 @@ $(library).type := shared
 $(library).libs := ext++ timber
 
 test.deps = $(library)
-test.libs := $(project) ext++ fmt gtest timber
+test.libs := $(project) crypto ext++ fmt gtest ssl timber
 
 install.directories = $(include)/$(project)
 

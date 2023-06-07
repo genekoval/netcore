@@ -111,6 +111,10 @@ namespace netcore {
         }
     }
 
+    auto socket::take() -> fd {
+        return std::exchange(descriptor, {});
+    }
+
     auto socket::try_read(void* dest, std::size_t len) -> long {
         const auto bytes_read = ::recv(descriptor, dest, len, 0);
 
