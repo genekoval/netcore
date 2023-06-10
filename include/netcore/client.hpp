@@ -12,7 +12,7 @@ namespace netcore {
     }
     struct client {
         class provider {
-            endpoint endpoint;
+            netcore::endpoint endpoint;
             std::size_t buffer_size = 0;
         public:
             provider() = default;

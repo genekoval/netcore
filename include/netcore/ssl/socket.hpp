@@ -11,7 +11,7 @@ namespace netcore::ssl {
     class socket {
         fd descriptor;
         system_event event;
-        ssl ssl;
+        netcore::ssl::ssl ssl;
     public:
         socket() = default;
 

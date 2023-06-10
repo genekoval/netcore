@@ -50,7 +50,7 @@ namespace netcore {
         event<> no_connections;
         unsigned int connection_count = 0;
         bool close_requested = false;
-        socket* socket = nullptr;
+        netcore::socket* socket = nullptr;
         address_type addr;
 
         auto accept() const -> ext::task<int> {

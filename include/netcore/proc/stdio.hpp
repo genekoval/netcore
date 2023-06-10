@@ -26,8 +26,8 @@ namespace netcore::proc {
     };
 
     class piped : public detail::stdio_base {
-        pipe pipe;
-        fd fd;
+        netcore::pipe pipe;
+        netcore::fd fd;
         system_event event;
     public:
         piped(int descriptor);

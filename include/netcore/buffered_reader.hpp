@@ -15,7 +15,7 @@ namespace netcore {
 
     template <source Source>
     class buffered_reader final {
-        buffer buffer;
+        netcore::buffer buffer;
         Source* source;
 
         auto read_bytes(std::byte* dest, std::size_t len) -> ext::task<> {

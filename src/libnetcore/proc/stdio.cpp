@@ -22,6 +22,8 @@ namespace {
             case stdio::piped:
                 return piped(descriptor);
         }
+
+        __builtin_unreachable();
     }
 }
 

@@ -35,6 +35,7 @@ namespace netcore::proc {
             case code::trapped: return "trapped";
             case code::stopped: return "stopped";
             case code::continued: return "continued";
+            default: return "<unknown>";
         }
     }
 

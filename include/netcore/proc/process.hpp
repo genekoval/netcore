@@ -21,7 +21,7 @@ namespace netcore::proc {
     auto to_string(code code) -> std::string_view;
 
     struct state {
-        code code;
+        proc::code code;
         int status;
     };
 

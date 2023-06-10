@@ -38,10 +38,10 @@ namespace netcore::proc {
     class command {
         arguments argv;
         std::optional<std::filesystem::path> directory;
-        std::array<stdio, 3> stdio {
-            stdio::null,
-            stdio::inherit,
-            stdio::inherit
+        std::array<proc::stdio, 3> stdio {
+            proc::stdio::null,
+            proc::stdio::inherit,
+            proc::stdio::inherit
         };
 
         [[noreturn]]
@@ -104,7 +104,7 @@ struct fmt::formatter<netcore::proc::arguments> : formatter<std::string_view> {
 
         format_to(it, "{}", arguments.storage[0]);
 
-        for (auto i = 1; i < arguments.storage.size(); ++i) {
+        for (auto i = 1ul; i < arguments.storage.size(); ++i) {
             format_to(it, " `{}`", arguments.storage[i]);
         }
 

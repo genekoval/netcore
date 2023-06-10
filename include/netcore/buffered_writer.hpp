@@ -12,7 +12,7 @@ namespace netcore {
 
     template <sink Sink>
     class buffered_writer final {
-        buffer buffer;
+        netcore::buffer buffer;
         Sink* sink;
 
         auto write_bytes(const std::byte* src, std::size_t len) -> ext::task<> {
