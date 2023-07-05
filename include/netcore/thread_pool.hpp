@@ -18,7 +18,6 @@ namespace netcore {
         std::vector<std::jthread> threads;
         std::condition_variable condition;
         std::mutex mutex;
-        ext::mutex waiters;
 
         auto entry(std::stop_token stoken) -> void;
     public:
