@@ -1,15 +1,19 @@
 #pragma once
 
-#include <netcore/async_thread.hpp>
+#include "async_thread.hpp"
 
 namespace netcore {
-    class thread_pool {
+    class async_thread_pool {
         std::size_t current = 0;
         std::vector<std::unique_ptr<async_thread>> threads;
 
         auto thread() noexcept -> async_thread&;
     public:
-        thread_pool(int count, unsigned int max_events, std::string_view name);
+        async_thread_pool(
+            int count,
+            unsigned int max_events,
+            std::string_view name
+        );
 
         auto run(ext::task<>&& task) -> void;
 
