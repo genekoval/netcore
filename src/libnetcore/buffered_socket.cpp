@@ -34,6 +34,10 @@ namespace netcore {
         return inner;
     }
 
+    auto buffered_socket::cancel() noexcept -> void {
+        inner.cancel();
+    }
+
     auto buffered_socket::connect(
         const endpoint& endpoint,
         std::size_t buffer_size
@@ -62,6 +66,10 @@ namespace netcore {
 
     auto buffered_socket::flush() -> ext::task<> {
         return writer.flush();
+    }
+
+    auto buffered_socket::peek() -> ext::task<std::span<const std::byte>> {
+        return reader.peek();
     }
 
     auto buffered_socket::read() -> ext::task<std::span<const std::byte>> {

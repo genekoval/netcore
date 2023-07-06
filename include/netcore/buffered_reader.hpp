@@ -86,6 +86,11 @@ namespace netcore {
             co_return bytes > 0;
         }
 
+        auto peek() -> ext::task<std::span<const std::byte>> {
+            if (buffer.empty()) co_await fill_buffer();
+            co_return buffer.data();
+        }
+
         auto read() -> ext::task<std::span<const std::byte>> {
             if (buffer.empty()) co_await fill_buffer();
             co_return buffer.read();

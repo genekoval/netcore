@@ -28,6 +28,8 @@ namespace netcore {
 
         operator int() const;
 
+        auto cancel() noexcept -> void;
+
         auto connected() -> bool;
 
         auto consume(std::size_t len) -> void;
@@ -37,6 +39,8 @@ namespace netcore {
         auto fill_buffer() -> ext::task<bool>;
 
         auto flush() -> ext::task<>;
+
+        auto peek() -> ext::task<std::span<const std::byte>>;
 
         auto read() -> ext::task<std::span<const std::byte>>;
 
