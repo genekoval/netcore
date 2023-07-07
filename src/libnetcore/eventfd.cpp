@@ -47,7 +47,7 @@ namespace netcore {
         return valid();
     }
 
-    auto eventfd_handle::set(uint64_t value) -> void {
+    auto eventfd_handle::set(uint64_t value) const -> void {
         if (eventfd_write(descriptor, value) == -1) {
             throw ext::system_error("failed to write eventfd value");
         }

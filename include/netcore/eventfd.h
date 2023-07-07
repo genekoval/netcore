@@ -29,7 +29,7 @@ namespace netcore {
 
         explicit operator bool() const noexcept;
 
-        auto set(uint64_t value = 1) -> void;
+        auto set(uint64_t value = 1) const -> void;
 
         auto valid() const noexcept -> bool;
     };
