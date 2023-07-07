@@ -44,6 +44,9 @@ namespace netcore {
                 jobs.pop();
             }
 
+            TIMBER_DEBUG("Job started");
+            TIMBER_TIMER("Job took");
+
             job();
         }
     }

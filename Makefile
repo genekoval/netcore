@@ -18,3 +18,5 @@ install.directories = $(include)/$(project)
 files = $(include) $(src) Makefile VERSION
 
 include mkbuild/base.mk
+
+defines.develop = TIMBER_TIMER_ACTIVE

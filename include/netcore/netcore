@@ -1,5 +1,6 @@
 #include "async_thread.hpp"
 #include "async_thread_pool.hpp"
+#include "awaitable_thread_pool.hpp"
 #include "client.hpp"
 #include "connect.hpp"
 #include "endpoint.hpp"
