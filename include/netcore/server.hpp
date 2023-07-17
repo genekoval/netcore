@@ -15,22 +15,29 @@
 
 namespace netcore {
     template <typename T>
-    concept server_context = requires(
-        T& t,
-        socket&& client,
-        const address_type& addr
-    ) {
-        { t.close() } -> std::same_as<void>;
-
+    concept server_context = requires(T& t, socket&& client) {
         { t.connection(std::forward<socket>(client)) } ->
             std::same_as<ext::task<>>;
-
-        { t.listen(addr) } -> std::same_as<void>;
     };
 
     template <typename T>
     concept server_context_backlog = requires(T t) {
         { t.backlog } -> std::convertible_to<int>;
+    };
+
+    template <typename T>
+    concept server_context_close = requires(T t) {
+        { t.close() } -> std::same_as<void>;
+    };
+
+    template <typename T>
+    concept server_context_listen = requires(T t, const address_type& addr) {
+        { t.listen(addr) } -> std::same_as<void>;
+    };
+
+    template <typename T>
+    concept server_context_shutdown = requires(T t) {
+        { t.shutdown() } -> std::same_as<void>;
     };
 
     template <server_context T>
@@ -110,7 +117,7 @@ namespace netcore {
 
             TIMBER_DEBUG("{} listening for connections", *socket);
 
-            context.listen(addr);
+            if constexpr (server_context_listen<T>) context.listen(addr);
 
             while (true) {
                 int client = -1;
@@ -130,6 +137,7 @@ namespace netcore {
             }
 
             socket = nullptr;
+            if constexpr (server_context_shutdown<T>) context.shutdown();
         }
 
         auto listen_priv(const inet_socket& inet) -> ext::task<> {
@@ -213,7 +221,7 @@ namespace netcore {
 
         auto wait_for_connections() -> ext::task<> {
             if (connection_count > 0) co_await no_connections.listen();
-            context.close();
+            if constexpr (server_context_close<T>) context.close();
         }
     public:
         T context;
