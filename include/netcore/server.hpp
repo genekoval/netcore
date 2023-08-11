@@ -54,8 +54,7 @@ namespace netcore {
 
         friend class guard;
 
-        event<> no_connections;
-        unsigned int connection_count = 0;
+        ext::counter connection_counter;
         bool close_requested = false;
         netcore::socket* socket = nullptr;
         address_type addr;
@@ -87,22 +86,19 @@ namespace netcore {
         }
 
         auto handle_connection(int client) -> ext::detached_task {
-            ++connection_count;
+            const auto counter_guard = connection_counter.increment();
 
-            TIMBER_DEBUG("client ({}) connected", client);
+            TIMBER_DEBUG("Client ({}) connected", client);
 
             try {
                 co_await context.connection(netcore::socket(client, EPOLLIN));
             }
             catch (const std::exception& ex) {
-                TIMBER_ERROR("client connection closed: {}", ex.what());
+                TIMBER_ERROR("Client connection closed: {}", ex.what());
             }
             catch (...) {
-                TIMBER_ERROR("client connection closed: unknown error");
+                TIMBER_ERROR("Client connection closed: Unknown error");
             }
-
-            --connection_count;
-            if (connection_count == 0) no_connections.emit();
         }
 
         auto listen() -> ext::task<> {
@@ -215,12 +211,11 @@ namespace netcore {
         auto reset() noexcept -> void {
             addr = std::monostate();
             close_requested = false;
-            connection_count = 0;
             socket = nullptr;
         }
 
         auto wait_for_connections() -> ext::task<> {
-            if (connection_count > 0) co_await no_connections.listen();
+            co_await connection_counter.await();
             if constexpr (server_context_close<T>) context.close();
         }
     public:
@@ -247,18 +242,18 @@ namespace netcore {
                 socket->notify();
             }
 
-            if (connection_count > 0) {
+            if (connection_counter) {
                 TIMBER_INFO(
                     "Waiting for {:L} connection{} on {}",
-                    connection_count,
-                    connection_count == 1 ? "" : "s",
+                    connection_counter.count(),
+                    connection_counter.count() == 1 ? "" : "s",
                     addr
                 );
             }
         }
 
         auto connections() const noexcept -> unsigned int {
-            return connection_count;
+            return connection_counter.count();
         }
 
         auto listen(const endpoint& endpoint) -> ext::jtask<> {
