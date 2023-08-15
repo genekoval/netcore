@@ -119,7 +119,7 @@ namespace netcore::ssl {
             case SSL_ERROR_SYSCALL:
                 if (ERR_peek_error()) throw error(read_error);
                 if (errno) throw ext::system_error(read_error);
-                return 0;
+                throw std::runtime_error(read_error);
             default:
                 throw error(read_error);
         }
