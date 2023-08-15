@@ -1,9 +1,11 @@
+#include <netcore/except.hpp>
 #include <netcore/ssl/error.hpp>
 #include <netcore/ssl/socket.hpp>
 
 #include <ext/except.h>
 #include <fmt/format.h>
 #include <openssl/err.h>
+#include <openssl/sslerr.h>
 #include <sys/epoll.h>
 #include <timber/timber>
 
@@ -120,6 +122,15 @@ namespace netcore::ssl {
                 if (ERR_peek_error()) throw error(read_error);
                 if (errno) throw ext::system_error(read_error);
                 throw std::runtime_error(read_error);
+            case SSL_ERROR_SSL:
+                if (
+                    ERR_GET_REASON(ERR_peek_error()) ==
+                    SSL_R_UNEXPECTED_EOF_WHILE_READING
+                ) {
+                    ERR_get_error(); // Remove the error from the queue.
+                    throw eof();
+                }
+                [[fallthrough]];
             default:
                 throw error(read_error);
         }
