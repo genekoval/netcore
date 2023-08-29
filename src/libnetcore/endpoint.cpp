@@ -1,9 +1,27 @@
 #include <netcore/endpoint.hpp>
 
+#include <timber/timber>
+
 namespace netcore {
     auto unix_socket::apply_permissions() const -> void {
         if (mode) std::filesystem::permissions(path, mode.value());
         ext::chown(path, owner, group);
+    }
+
+    auto unix_socket::remove() const noexcept -> void {
+        auto error = std::error_code();
+        const auto removed = std::filesystem::remove(path, error);
+
+        if (error) {
+            TIMBER_ERROR(
+                R"(Failed to remove socket file "{}": {})",
+                path.native(),
+                error.message()
+            );
+        }
+        else if (removed) {
+            TIMBER_DEBUG(R"(Removed socket file "{}")", path.native());
+        }
     }
 
     auto parse_endpoint(std::string_view string) -> endpoint {

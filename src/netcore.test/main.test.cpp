@@ -19,7 +19,7 @@ namespace {
     auto file_logger(const timber::log& log) noexcept -> void {
         auto lock = std::scoped_lock<std::mutex>(mutex);
 
-        log_file.print("{:%b %m %r}", log.timestamp);
+        log_file.print("{:%b %d %r}", log.timestamp);
         log_file.print(" {:9} ", log.log_level);
         log_file.print("[{}] ", log.thread_name);
         log_file.print("{}\n", log.message);

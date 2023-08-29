@@ -1,9 +1,10 @@
 #pragma once
 
+#include "detail/awaiter.hpp"
 #include "fd.hpp"
-#include "system_event.hpp"
 
 #include <chrono>
+#include <ext/coroutine>
 #include <ext/except.h>
 #include <memory>
 #include <sys/epoll.h>
@@ -16,8 +17,50 @@ namespace netcore {
         const int max_events;
 
         detail::awaiter_queue pending;
-        std::size_t system_events = 0;
+        unsigned long awaiters = 0;
     public:
+        class awaiter {
+            int descriptor = -1;
+            bool canceled = false;
+            std::uint32_t submission = 0;
+            std::uint32_t completion = 0;
+            std::coroutine_handle<> coroutine;
+        public:
+            awaiter() = default;
+
+            awaiter(int fd) noexcept;
+
+            awaiter(const awaiter&) = delete;
+
+            awaiter(awaiter&& other);
+
+            ~awaiter();
+
+            auto operator=(const awaiter&) -> awaiter& = delete;
+
+            auto operator=(awaiter&& other) -> awaiter&;
+
+            auto add(std::uint32_t events) -> void;
+
+            auto awaiting() const noexcept -> bool;
+
+            auto await_ready() const noexcept -> bool;
+
+            auto await_suspend(std::coroutine_handle<> coroutine) -> void;
+
+            auto await_resume() noexcept -> std::uint32_t;
+
+            auto cancel() -> void;
+
+            auto events() const noexcept -> std::uint32_t;
+
+            auto fd() const noexcept -> int;
+
+            auto resume(std::uint32_t events) -> void;
+
+            auto set(std::uint32_t events) -> void;
+        };
+
         static auto active() -> bool;
 
         static auto current() -> runtime&;
@@ -28,7 +71,7 @@ namespace netcore {
 
         ~runtime();
 
-        auto add(system_event* system_event) -> void;
+        auto add(awaiter* a) -> void;
 
         auto run() -> void;
 
@@ -36,7 +79,9 @@ namespace netcore {
 
         auto enqueue(detail::awaiter_queue& awaiters) -> void;
 
-        auto remove(system_event* system_event) -> void;
+        auto modify(awaiter* a) -> void;
+
+        auto remove(int fd) -> void;
     };
 
     auto run() -> void;

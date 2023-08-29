@@ -1,9 +1,10 @@
 #pragma once
 
-#include <netcore/eventfd.h>
+#include <netcore/eventfd.hpp>
 
 #include <ext/coroutine>
 #include <functional>
+#include <optional>
 #include <queue>
 #include <thread>
 

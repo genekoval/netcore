@@ -1,6 +1,7 @@
 #pragma once
 
-#include <netcore/socket.h>
+#include "fd.hpp"
+#include "system_event.hpp"
 
 #include <cstdint>
 #include <span>
@@ -11,8 +12,6 @@ namespace netcore {
         system_event event;
 
         explicit signalfd(int descriptor);
-
-        auto read(void* buffer, std::size_t len) -> ext::task<void>;
     public:
         static auto create(std::span<const int> signals) -> signalfd;
 

@@ -19,23 +19,17 @@ namespace netcore {
             auto sock = socket(
                 res->ai_family,
                 res->ai_socktype,
-                res->ai_protocol,
-                EPOLLOUT
+                res->ai_protocol
             );
 
-            while (true) {
-                if (::connect(sock, res->ai_addr, res->ai_addrlen) == 0) {
-                    TIMBER_DEBUG(
-                        "{} connected to {}",
-                        sock,
-                        socket_addr(res->ai_addr, res->ai_addrlen)
-                    );
-                    co_return sock;
-                }
+            if (co_await sock.connect(res->ai_addr, res->ai_addrlen)) {
+                TIMBER_DEBUG(
+                    "{} connected to {}",
+                    sock,
+                    socket_addr(res->ai_addr, res->ai_addrlen)
+                );
 
-                if (errno != EINPROGRESS) break;
-
-                co_await sock.wait();
+                co_return sock;
             }
         }
 
@@ -46,21 +40,14 @@ namespace netcore {
 
     auto connect(std::string_view path) -> ext::task<socket> {
         auto addr = sockaddr_un();
-        std::memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         path.copy(addr.sun_path, path.size());
 
-        auto sock = socket(AF_UNIX, SOCK_STREAM, 0, EPOLLOUT);
+        auto sock = socket(AF_UNIX, SOCK_STREAM, 0);
 
-        while (true) {
-            if (::connect(sock, (sockaddr*) &addr, sizeof(addr)) == 0) {
-                TIMBER_DEBUG("{} connected to \"{}\"", sock, path);
-                co_return sock;
-            }
-
-            if (errno != EINPROGRESS) break;
-
-            co_await sock.wait();
+        if (co_await sock.connect((sockaddr*) &addr, sizeof(addr))) {
+            TIMBER_DEBUG("{} connected to \"{}\"", sock, path);
+            co_return sock;
         }
 
         throw ext::system_error(fmt::format(

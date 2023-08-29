@@ -1,4 +1,4 @@
-#include <netcore/eventfd.h>
+#include <netcore/eventfd.hpp>
 #include <netcore/thread_pool.hpp>
 
 #include <fmt/format.h>
@@ -34,7 +34,7 @@ namespace netcore {
             {
                 auto l = lock(mutex);
 
-                condition.wait(l, [this, &stoken]() {
+                condition.wait(l, [&] {
                     return stoken.stop_requested() || !jobs.empty();
                 });
 

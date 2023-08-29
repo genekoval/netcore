@@ -7,7 +7,6 @@
 
 using namespace std::chrono_literals;
 
-using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 
 namespace {
@@ -20,11 +19,10 @@ namespace {
         timer.set(time);
 
         const auto start = now();
-        co_await timer.wait();
-        const auto end = now();
+        const auto expirations = co_await timer.wait();
+        const auto elapsed = now() - start;
 
-        const auto elapsed = duration_cast<milliseconds>(end - start);
-
+        EXPECT_EQ(1, expirations);
         EXPECT_GE(elapsed, time);
     }
 }
@@ -43,55 +41,26 @@ TEST(Timer, WaitSecond) {
 
 TEST(Timer, Disarm) {
     netcore::run([]() -> ext::task<> {
-        constexpr auto time = 200ms;
+        constexpr auto time = 30s;
 
-        const auto task = [](
-            netcore::timer& timer,
-            bool& canceled,
-            netcore::event<>& event
-        ) -> ext::detached_task {
-            try {
-                co_await timer.wait();
-            }
-            catch (const netcore::task_canceled&) {
-                canceled = true;
-            }
-
-            event.emit();
-        };
-
-        auto event = netcore::event();
+        auto continuation = ext::continuation<>();
         auto canceled = false;
         auto timer = netcore::timer::monotonic();
-        timer.set(time);
 
-        task(timer, canceled, event);
+        const auto wait = [&]() -> ext::detached_task {
+            canceled = co_await timer.wait() == 0;
+            continuation.resume();
+        };
+
+        timer.set(time);
+        wait();
         timer.disarm();
 
         const auto start = now();
-        co_await event.listen();
-        const auto end = now();
-
-        const auto elapsed = duration_cast<milliseconds>(end - start);
+        co_await continuation;
+        const auto elapsed = now() - start;
 
         EXPECT_LT(elapsed, time);
         EXPECT_TRUE(canceled);
-    }());
-}
-
-TEST(Timer, MultipleAwaiters) {
-    netcore::run([]() -> ext::task<> {
-        auto timer = netcore::timer::monotonic();
-        const auto wait = [&]() -> ext::jtask<> {
-            co_await timer.wait();
-        };
-
-        timer.set(50ms);
-
-        const auto t1 = wait();
-        const auto t2 = wait();
-
-        co_await t1;
-        co_await t2;
     }());
 }

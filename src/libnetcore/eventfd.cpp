@@ -1,4 +1,4 @@
-#include <netcore/eventfd.h>
+#include <netcore/eventfd.hpp>
 
 #include <ext/except.h>
 #include <sys/eventfd.h>
@@ -8,10 +8,10 @@
 namespace netcore {
     eventfd::eventfd() :
         descriptor(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)),
-        ev(descriptor, EPOLLIN)
+        event(descriptor)
     {
         if (!descriptor.valid()) {
-            throw ext::system_error("failed to create eventfd");
+            throw ext::system_error("Failed to create eventfd");
         }
 
         TIMBER_TRACE("eventfd ({}) created", descriptor);
@@ -21,7 +21,8 @@ namespace netcore {
         return {descriptor};
     }
 
-    auto eventfd::wait() -> ext::task<uint64_t> {
+    auto eventfd::wait() -> ext::task<std::uint64_t> {
+        std::uint64_t value = 0;
         auto retval = -1;
 
         do {
@@ -29,15 +30,15 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await ev.wait(0, nullptr);
-                    continue;
+                    if (co_await event.in()) continue;
+                    else co_return 0;
                 }
 
-                throw ext::system_error("failed to read eventfd value");
+                throw ext::system_error("Failed to read eventfd value");
             }
         } while (retval != 0);
 
-        TIMBER_TRACE("eventfd ({}) read {}", descriptor, value);
+        TIMBER_TRACE("eventfd ({}) read {:L}", descriptor, value);
         co_return value;
     }
 
@@ -47,12 +48,12 @@ namespace netcore {
         return valid();
     }
 
-    auto eventfd_handle::set(uint64_t value) const -> void {
+    auto eventfd_handle::set(std::uint64_t value) const -> void {
         if (eventfd_write(descriptor, value) == -1) {
-            throw ext::system_error("failed to write eventfd value");
+            throw ext::system_error("Failed to write eventfd value");
         }
 
-        TIMBER_TRACE("eventfd ({}) set {}", descriptor, value);
+        TIMBER_TRACE("eventfd ({}) set {:L}", descriptor, value);
     }
 
     auto eventfd_handle::valid() const noexcept -> bool {

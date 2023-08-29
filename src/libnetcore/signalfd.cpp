@@ -11,7 +11,7 @@
 namespace netcore {
     signalfd::signalfd(int descriptor) :
         descriptor(descriptor),
-        event(this->descriptor, EPOLLIN)
+        event(this->descriptor)
     {
         TIMBER_TRACE("signalfd ({}) created", descriptor);
     }
@@ -30,41 +30,24 @@ namespace netcore {
 
         auto fd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
         if (fd == -1) {
-            throw ext::system_error("signalfd create failure");
+            throw ext::system_error("Failed to create signalfd");
         }
 
         return signalfd(fd);
     }
 
-    auto signalfd::read(
-        void* buffer,
-        std::size_t len
-    ) -> ext::task<void> {
-        std::size_t total = 0;
-
-        do {
-            const auto bytes = ::read(descriptor, buffer, len);
-
-            if (bytes == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await event.wait(0, nullptr);
-                    continue;
-                }
-
-                throw ext::system_error("failed to read signalfd data");
-            }
-
-            total += bytes;
-        }
-        while (total < len);
-    }
-
     auto signalfd::wait_for_signal() -> ext::task<int> {
-        constexpr auto infolen = sizeof(signalfd_siginfo);
+        while (true) {
+            auto info = signalfd_siginfo();
 
-        auto info = signalfd_siginfo();
-        co_await read(&info, infolen);
+            const auto bytes = ::read(descriptor, &info, sizeof(info));
 
-        co_return info.ssi_signo;
+            if (bytes == sizeof(info)) co_return info.ssi_signo;
+
+            if (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                if (!co_await event.in()) co_return 0;
+            }
+            else throw ext::system_error("Failed to read signal info");
+        }
     }
 }

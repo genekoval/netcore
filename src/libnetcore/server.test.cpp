@@ -12,8 +12,6 @@ using testing::Test;
 namespace {
     using number_type = std::int32_t;
 
-    constexpr auto socket_name = "netcore.test.sock";
-
     template <typename F>
     concept client_handler = requires(const F& f, netcore::socket&& client) {
         { f(std::forward<netcore::socket>(client)) } ->
@@ -21,7 +19,7 @@ namespace {
     };
 
     const netcore::endpoint endpoint = unix_socket {
-        .path = fs::temp_directory_path() / socket_name,
+        .path = fs::temp_directory_path() / "netcore.test.sock",
         .mode = fs::perms::owner_read | fs::perms::owner_write
     };
 
@@ -30,9 +28,15 @@ namespace {
             TIMBER_INFO("Test server closed");
         }
 
-        auto connection(netcore::socket&& client) -> ext::task<> {
+        auto connection(netcore::socket client) -> ext::task<> {
             number_type number = 0;
-            co_await client.read(&number, sizeof(number_type));
+
+            const auto bytes = co_await client.read(
+                &number,
+                sizeof(number_type)
+            );
+
+            if (bytes < sizeof(number_type)) co_return;
 
             TIMBER_DEBUG("increment: received {}", number);
 
@@ -46,27 +50,25 @@ namespace {
                 address
             );
         }
+
+        auto shutdown() -> void {
+            TIMBER_INFO("Test server shutting down");
+        }
     };
 }
 
 class ServerTest : public Test {
-    auto connect() -> ext::task<netcore::socket> {
-        co_return co_await netcore::connect(endpoint);
-    }
-
     auto task(const client_handler auto& handler) -> ext::task<> {
-        auto server_task = server.listen(endpoint);
+        const auto server_task = server.listen(endpoint);
         if (server_task.is_ready()) co_await server_task;
 
-        co_await handler(co_await connect());
+        co_await handler(co_await netcore::connect(endpoint));
 
         server.close();
         co_await server_task;
     }
 protected:
     netcore::server<server_context> server;
-
-    ServerTest() : server() {}
 
     auto connect(const client_handler auto& handler) -> void {
         netcore::run(task(handler));
@@ -76,7 +78,7 @@ protected:
 TEST_F(ServerTest, StartStop) {
     const auto& unix = std::get<netcore::unix_socket>(endpoint);
 
-    connect([&](netcore::socket&& client) -> ext::task<> {
+    connect([&](netcore::socket client) -> ext::task<> {
         EXPECT_TRUE(fs::is_socket(unix.path));
         co_return;
     });
@@ -85,7 +87,7 @@ TEST_F(ServerTest, StartStop) {
 }
 
 TEST_F(ServerTest, Connection) {
-    connect([](netcore::socket&& client) -> ext::task<> {
+    connect([](netcore::socket client) -> ext::task<> {
         constexpr number_type number = 3;
 
         co_await client.write(&number, sizeof(number_type));
@@ -103,7 +105,7 @@ TEST_F(ServerTest, ServerInfo) {
     EXPECT_TRUE(std::holds_alternative<std::monostate>(server.address()));
     EXPECT_EQ(0, server.connections());
 
-    connect([&](netcore::socket&& client) -> ext::task<> {
+    connect([&](netcore::socket client) -> ext::task<> {
         EXPECT_TRUE(server.listening());
 
         EXPECT_TRUE(std::holds_alternative<fs::path>(server.address()));

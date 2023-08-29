@@ -11,22 +11,19 @@
 #include <utility>
 
 namespace netcore {
-    socket::socket(int fd, uint32_t events) :
-        descriptor(fd),
-        event(fd, events)
-    {
+    socket::socket(int fd) : descriptor(fd), event(fd) {
         TIMBER_TRACE("{} created", *this);
     }
 
-    socket::socket(int domain, int type, int protocol, uint32_t events) :
+    socket::socket(int domain, int type, int protocol) :
         socket(::socket(
             domain,
             type | SOCK_NONBLOCK | SOCK_CLOEXEC,
             protocol
-        ), events)
+        ))
     {
         if (!descriptor.valid()) {
-            throw ext::system_error("failed to create socket");
+            throw ext::system_error("Failed to create socket");
         }
     }
 
@@ -34,6 +31,17 @@ namespace netcore {
 
     auto socket::cancel() noexcept -> void {
         event.cancel();
+    }
+
+    auto socket::connect(
+        const sockaddr* addr,
+        socklen_t len
+    ) -> ext::task<bool> {
+        while (true) {
+            if (::connect(descriptor, addr, len) == 0) co_return true;
+            if (errno == EINPROGRESS) co_await event.out();
+            else co_return false;
+        }
     }
 
     auto socket::end() const -> void {
@@ -54,10 +62,6 @@ namespace netcore {
         throw ext::system_error(message);
     }
 
-    auto socket::notify() -> void {
-        event.notify();
-    }
-
     auto socket::read(
         void* dest,
         std::size_t len
@@ -66,7 +70,7 @@ namespace netcore {
 
         do {
             bytes_read = try_read(dest, len);
-            if (bytes_read == -1) co_await wait(EPOLLIN);
+            if (bytes_read == -1) co_await event.in();
         } while (bytes_read == -1);
 
         TIMBER_TRACE(
@@ -96,7 +100,7 @@ namespace netcore {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await wait(EPOLLOUT);
+                    co_await event.out();
                     continue;
                 }
 
@@ -127,10 +131,6 @@ namespace netcore {
 
     auto socket::valid() const -> bool { return descriptor.valid(); }
 
-    auto socket::wait(uint32_t events) -> ext::task<> {
-        co_await event.wait(events, nullptr);
-    }
-
     auto socket::write(
         const void* src,
         std::size_t len
@@ -142,11 +142,9 @@ namespace netcore {
 
             if (bytes_written == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await wait(EPOLLOUT);
-                    continue;
+                    co_await event.out();
                 }
-
-                failure("failed to send data");
+                else failure("failed to send data");
             }
         } while (bytes_written == -1);
 

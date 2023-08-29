@@ -1,53 +1,32 @@
 #pragma once
 
-#include "detail/awaiter.hpp"
+#include "runtime.hpp"
 
 #include <cstdint>
 #include <ext/coroutine>
 
 namespace netcore {
-    class runtime;
-
     class system_event {
-        friend class runtime;
-
-        int fd = -1;
-        uint32_t events = 0;
-        bool registered = false;
-        detail::awaiter_queue awaiters;
-
-        auto resume() -> void;
+        runtime::awaiter awaiter;
     public:
         system_event() = default;
 
-        system_event(int fd, uint32_t events);
+        system_event(int fd);
 
-        system_event(const system_event&) = delete;
+        auto add(std::uint32_t events) -> void;
 
-        system_event(system_event&& other);
-
-        auto operator=(const system_event&) -> system_event& = delete;
-
-        auto operator=(system_event&&) -> system_event&;
+        auto awaiting() const noexcept -> bool;
 
         auto cancel() -> void;
 
-        auto error(std::exception_ptr ex) noexcept -> void;
+        auto in() -> ext::task<bool>;
 
-        auto latest_events() const noexcept -> uint32_t;
+        auto out() -> ext::task<bool>;
 
-        auto notify() -> void;
+        auto set(std::uint32_t events) -> void;
 
-        template <typename T>
-        auto notify(const T state) -> void {
-            awaiters.assign(state);
-            notify();
-        }
+        auto wait() -> ext::task<std::uint32_t>;
 
-        auto read(void* buffer, std::size_t len) -> ext::task<std::size_t>;
-
-        auto wait(uint32_t events, void* state) -> ext::task<detail::awaiter*>;
-
-        auto write(const void* data, std::size_t len) -> ext::task<std::size_t>;
+        auto wait_for(std::uint32_t events) -> ext::task<std::uint32_t>;
     };
 }

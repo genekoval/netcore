@@ -50,7 +50,7 @@ namespace netcore {
 
     timer::timer(int clockid) :
         descriptor(timerfd_create(clockid, TFD_NONBLOCK | TFD_CLOEXEC)),
-        event(descriptor, EPOLLIN)
+        event(descriptor)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create timer");
@@ -108,8 +108,6 @@ namespace netcore {
 
     auto timer::wait() -> ext::task<std::uint64_t> {
         std::uint64_t expirations = 0;
-        detail::awaiter* awaiters = nullptr;
-
         auto retval = -1;
 
         do {
@@ -117,19 +115,19 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    awaiters = co_await event.wait(0, &expirations);
-                    if (expirations > 0) break;
-                    continue;
+                    if (co_await event.in()) continue;
+                    else co_return 0;
                 }
 
-                throw ext::system_error("failed to read timer value");
+                throw ext::system_error("Failed to read timer value");
             }
-
-            event.notify(expirations);
-            if (awaiters) awaiters->assign(expirations);
         } while (retval != sizeof(expirations));
 
-        TIMBER_TRACE("{} expirations: {}", *this, expirations);
+        TIMBER_TRACE("{} expirations: {:L}", *this, expirations);
         co_return expirations;
+    }
+
+    auto timer::waiting() const noexcept -> bool {
+        return event.awaiting();
     }
 }

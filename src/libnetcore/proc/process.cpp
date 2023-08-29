@@ -42,7 +42,7 @@ namespace netcore::proc {
     process::process(pid_t pid) :
         id(pid),
         descriptor(syscall(SYS_pidfd_open, id, PIDFD_NONBLOCK)),
-        event(descriptor, EPOLLIN)
+        event(descriptor)
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to open pid fd");
@@ -57,11 +57,12 @@ namespace netcore::proc {
 
     auto process::kill(int signal) const -> void {
         const auto* str = strsignal(signal);
+        str = str ? str : "invalid signal";
 
         TIMBER_DEBUG(
             "Sending signal ({}: {}) to process with PID {}",
             signal,
-            str ? str : "invalid signal",
+            str,
             id
         );
 
@@ -69,7 +70,7 @@ namespace netcore::proc {
             throw ext::system_error(fmt::format(
                 "failed to send signal ({}: {}) to process with PID {}",
                 signal,
-                str ? str : "invalid signal",
+                str,
                 id
             ));
         }
@@ -84,7 +85,7 @@ namespace netcore::proc {
 
         do {
             if (waitid(P_PIDFD, descriptor, &siginfo, states) == -1) {
-                if (errno == EAGAIN) co_await event.wait(0, nullptr);
+                if (errno == EAGAIN) co_await event.in();
                 else throw ext::system_error(fmt::format(
                     "failed to wait for process with PID {}",
                     id

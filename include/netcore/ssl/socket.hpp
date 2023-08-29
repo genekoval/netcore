@@ -2,15 +2,15 @@
 
 #include "ssl.hpp"
 
+#include <netcore/bidirectional_event.hpp>
 #include <netcore/fd.hpp>
-#include <netcore/system_event.hpp>
 
 #include <fmt/format.h>
 
 namespace netcore::ssl {
     class socket {
         fd descriptor;
-        system_event event;
+        bidirectional_event event;
         netcore::ssl::ssl ssl;
     public:
         socket() = default;

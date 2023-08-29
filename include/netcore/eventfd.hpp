@@ -8,14 +8,13 @@ namespace netcore {
 
     class eventfd {
         fd descriptor;
-        system_event ev;
-        uint64_t value = 0;
+        system_event event;
     public:
         eventfd();
 
         auto handle() const noexcept -> eventfd_handle;
 
-        auto wait() -> ext::task<uint64_t>;
+        auto wait() -> ext::task<std::uint64_t>;
     };
 
     class eventfd_handle {
@@ -29,7 +28,7 @@ namespace netcore {
 
         explicit operator bool() const noexcept;
 
-        auto set(uint64_t value = 1) const -> void;
+        auto set(std::uint64_t value = 1) const -> void;
 
         auto valid() const noexcept -> bool;
     };

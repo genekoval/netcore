@@ -41,6 +41,8 @@ namespace netcore {
         auto set(const time& t) const -> void;
 
         auto wait() -> ext::task<std::uint64_t>;
+
+        auto waiting() const noexcept -> bool;
     };
 
     template <typename Rep, typename Period>

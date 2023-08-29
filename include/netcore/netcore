@@ -4,7 +4,7 @@
 #include "client.hpp"
 #include "connect.hpp"
 #include "endpoint.hpp"
-#include "eventfd.h"
+#include "eventfd.hpp"
 #include "except.hpp"
 #include "file.hpp"
 #include "flags.hpp"

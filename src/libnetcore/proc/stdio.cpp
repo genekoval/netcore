@@ -1,9 +1,11 @@
 #include <netcore/proc/stdio.hpp>
 #include <netcore/file.hpp>
 
+#include <ext/except.h>
 #include <fcntl.h>
 #include <fmt/format.h>
 #include <sys/epoll.h>
+#include <timber/timber>
 #include <unistd.h>
 
 using netcore::proc::inherit;
@@ -78,22 +80,64 @@ namespace netcore::proc {
 
     auto piped::parent() -> void {
         fd = descriptor == STDIN_FILENO ? pipe.write() : pipe.read();
-
-        event = system_event(
-            fd,
-            descriptor == STDIN_FILENO ? EPOLLOUT : EPOLLIN
-        );
+        event = system_event(fd);
     }
 
     auto piped::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
-        return event.read(dest, len);
+        auto bytes = -1;
+
+        do {
+            bytes = ::read(fd, dest, len);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await event.in();
+                }
+                else {
+                    TIMBER_DEBUG("fd ({}) failed to read data", fd);
+                    throw ext::system_error("Failed to read data");
+                }
+            }
+        } while (bytes == -1);
+
+        TIMBER_TRACE(
+            "fd ({}) read {:L} byte{}",
+            fd,
+            bytes,
+            bytes == 1 ? "" : "s"
+        );
+
+        co_return bytes;
     }
 
     auto piped::write(
         const void* src,
         std::size_t len
     ) -> ext::task<std::size_t> {
-        return event.write(src, len);
+        auto bytes = -1;
+
+        do {
+            bytes = ::write(fd, src, len);
+
+            if (bytes == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    co_await event.out();
+                }
+                else {
+                    TIMBER_DEBUG("fd ({}) failed to write data", fd);
+                    throw ext::system_error("Failed to write data");
+                }
+            }
+        } while (bytes == -1);
+
+        TIMBER_TRACE(
+            "fd ({}) write {:L} byte{}",
+            fd,
+            bytes,
+            bytes == 1 ? "" : "s"
+        );
+
+        co_return bytes;
     }
 
     stdio_stream::stdio_stream(int descriptor, stdio stdio) :

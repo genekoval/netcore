@@ -6,21 +6,23 @@
 #include <ext/except.h>
 
 namespace {
-    thread_local netcore::runtime* current_ptr = nullptr;
+    constexpr auto permanent_events = EPOLLET;
+
+    thread_local netcore::runtime* current_runtime = nullptr;
 }
 
 namespace netcore {
     auto runtime::active() -> bool {
-        return current_ptr != nullptr;
+        return current_runtime != nullptr;
     }
 
     auto runtime::current() -> runtime& {
         assert(
-            (current_ptr != nullptr) &&
+            (current_runtime != nullptr) &&
             "no active runtime in current thread"
         );
 
-        return *current_ptr;
+        return *current_runtime;
     }
 
     runtime::runtime(int max_events) :
@@ -32,44 +34,64 @@ namespace netcore {
             throw ext::system_error("epoll create failure");
         }
 
-        if (current_ptr) {
+        if (current_runtime) {
             throw std::runtime_error(
                 "runtime cannot be created: already exists"
             );
         }
 
-        current_ptr = this;
+        current_runtime = this;
 
         TIMBER_TRACE("{} created", *this);
     }
 
     runtime::~runtime() {
-        current_ptr = nullptr;
+        current_runtime = nullptr;
         TIMBER_TRACE("{} destroyed", *this);
     }
 
-    auto runtime::add(system_event* event) -> void {
+    auto runtime::add(awaiter* a) -> void {
         auto ev = epoll_event {
-            .events = event->events,
+            .events = a->events() | permanent_events,
             .data = {
-                .ptr = event
+                .ptr = a
             }
         };
 
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_ADD,
-            event->fd,
+            a->fd(),
             &ev
         ) == -1) {
-            TIMBER_DEBUG("{} failed to add entry ({})", *this, event->fd);
-            throw ext::system_error("failed to add entry to interest list");
+            TIMBER_DEBUG("{} failed to add entry ({})", *this, a->fd());
+            throw ext::system_error("Failed to add entry to interest list");
         }
 
-        TIMBER_TRACE("{} added entry ({})", *this, event->fd);
+        ++awaiters;
 
-        event->registered = true;
-        ++system_events;
+        TIMBER_TRACE("{} added entry ({})", *this, a->fd());
+    }
+
+    auto runtime::modify(awaiter* a) -> void {
+        auto ev = epoll_event {
+            .events = a->events() | permanent_events,
+            .data = {
+                .ptr = a
+            }
+        };
+
+        if (epoll_ctl(
+            descriptor,
+            EPOLL_CTL_MOD,
+            a->fd(),
+            &ev
+        ) == -1) {
+            TIMBER_DEBUG("{} failed to modify entry ({})", *this, a->fd());
+            throw ext::system_error("Failed to modify runtime entry");
+        }
+
+        TIMBER_TRACE("{} modified entry ({})", *this, a->fd());
     }
 
     auto runtime::enqueue(detail::awaiter& a) -> void {
@@ -80,26 +102,15 @@ namespace netcore {
         pending.enqueue(awaiters);
     }
 
-    auto runtime::remove(system_event* event) -> void {
-        --system_events;
+    auto runtime::remove(int fd) -> void {
+        --awaiters;
 
-        if (epoll_ctl(
-            descriptor,
-            EPOLL_CTL_DEL,
-            event->fd,
-            nullptr
-        ) == -1) {
-            TIMBER_DEBUG(
-                "{} failed to remove entry ({})",
-                *this,
-                event->fd
-            );
-            throw ext::system_error("failed to remove entry in interest list");
+        if (epoll_ctl(descriptor, EPOLL_CTL_DEL, fd, nullptr) == -1) {
+            TIMBER_DEBUG("{} failed to remove entry ({})", *this, fd);
+            throw ext::system_error("Failed to remove entry in interest list");
         }
 
-        TIMBER_TRACE("{} removed entry ({})", *this, event->fd);
-
-        event->registered = false;
+        TIMBER_TRACE("{} removed entry ({})", *this, fd);
     }
 
     auto runtime::run() -> void {
@@ -110,8 +121,13 @@ namespace netcore {
 
         TIMBER_TRACE("{} starting up", *this);
 
-        while (!pending.empty() || system_events > 0) {
-            TIMBER_TRACE("{} waiting for events", *this);
+        while (awaiters > 0 || !pending.empty()) {
+            TIMBER_TRACE(
+                "{} {:L} task{} waiting for events",
+                *this,
+                awaiters,
+                awaiters == 1 ? "" : "s"
+            );
 
             const auto wait_started = clock::now();
 
@@ -131,7 +147,7 @@ namespace netcore {
                 *this,
                 wait_time.count(),
                 ready,
-                system_events
+                awaiters
             );
 
             if (ready == -1) {
@@ -141,11 +157,9 @@ namespace netcore {
             }
 
             for (auto i = 0; i < ready; ++i) {
-                const auto& ev = events[i];
-                auto& event = *static_cast<system_event*>(ev.data.ptr);
-
-                event.events = ev.events;
-                event.resume();
+                const auto& event = events[i];
+                auto* a = static_cast<awaiter*>(event.data.ptr);
+                a->resume(event.events);
             }
 
             TIMBER_DEBUG(
@@ -160,8 +174,102 @@ namespace netcore {
         TIMBER_TRACE("{} stopped", *this);
     }
 
+    runtime::awaiter::awaiter(int fd) noexcept : descriptor(fd) {}
+
+    runtime::awaiter::awaiter(awaiter&& other) :
+        descriptor(std::exchange(other.descriptor, -1)),
+        submission(std::exchange(other.submission, 0)),
+        completion(std::exchange(other.completion, 0)),
+        coroutine(std::exchange(other.coroutine, nullptr))
+    {
+        if (coroutine) runtime::current().modify(this);
+    }
+
+    runtime::awaiter::~awaiter() {
+        if (coroutine) {
+            try {
+                runtime::current().remove(descriptor);
+            }
+            catch (const std::exception& ex) {
+                TIMBER_ERROR(ex.what());
+            }
+        }
+    }
+
+    auto runtime::awaiter::operator=(awaiter&& other) -> awaiter& {
+        if (std::addressof(other) != this) {
+            std::destroy_at(this);
+            std::construct_at(this, std::move(other));
+        }
+
+        return *this;
+    }
+
+    auto runtime::awaiter::add(std::uint32_t events) -> void {
+        set(submission | events);
+    }
+
+    auto runtime::awaiter::awaiting() const noexcept -> bool {
+        return coroutine != nullptr;
+    }
+
+    auto runtime::awaiter::await_ready() const noexcept -> bool {
+        return canceled;
+    }
+
+    auto runtime::awaiter::await_suspend(
+        std::coroutine_handle<> coroutine
+    ) -> void {
+        TIMBER_TRACE("fd ({}) suspended", descriptor);
+
+        runtime::current().add(this);
+        this->coroutine = coroutine;
+    }
+
+    auto runtime::awaiter::await_resume() noexcept -> std::uint32_t {
+        TIMBER_TRACE(
+            "fd ({}) {}",
+            descriptor,
+            canceled ? "canceled" : "resumed"
+        );
+
+        if (coroutine) runtime::current().remove(descriptor);
+
+        coroutine = nullptr;
+        canceled = false;
+
+        return std::exchange(completion, 0);
+    }
+
+    auto runtime::awaiter::cancel() -> void {
+        canceled = true;
+        if (coroutine) coroutine.resume();
+    }
+
+    auto runtime::awaiter::events() const noexcept -> std::uint32_t {
+        return submission;
+    }
+
+    auto runtime::awaiter::fd() const noexcept -> int {
+        return descriptor;
+    }
+
+    auto runtime::awaiter::resume(std::uint32_t events) -> void {
+        completion = events;
+        if (coroutine) coroutine.resume();
+    }
+
+    auto runtime::awaiter::set(std::uint32_t events) -> void {
+        const auto submission = this->submission;
+        this->submission = events;
+
+        if (coroutine && this->submission != submission) {
+            runtime::current().modify(this);
+        }
+    }
+
     auto run() -> void {
-        if (current_ptr) current_ptr->run();
+        if (current_runtime) current_runtime->run();
         else runtime().run();
     }
 

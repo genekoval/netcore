@@ -16,7 +16,7 @@ namespace {
 namespace netcore::ssl {
     socket::socket(fd&& descriptor, netcore::ssl::ssl&& ssl) :
         descriptor(std::forward<fd>(descriptor)),
-        event(this->descriptor, 0),
+        event(this->descriptor),
         ssl(std::forward<netcore::ssl::ssl>(ssl))
     {
         this->ssl.set_fd(this->descriptor);
@@ -33,10 +33,10 @@ namespace netcore::ssl {
 
             switch (ssl.get_error(ret)) {
                 case SSL_ERROR_WANT_READ:
-                    co_await event.wait(EPOLLIN, nullptr);
+                    co_await event.in();
                     break;
                 case SSL_ERROR_WANT_WRITE:
-                    co_await event.wait(EPOLLOUT, nullptr);
+                    co_await event.out();
                     break;
                 default:
                     throw error(
@@ -71,7 +71,8 @@ namespace netcore::ssl {
             const auto ret = try_read(dest, len);
             if (ret >= 0) co_return ret;
 
-            co_await event.wait(ret == -1 ? EPOLLIN : EPOLLOUT, nullptr);
+            if (ret == -1) co_await event.in();
+            else co_await event.out();
         }
     }
 
@@ -155,11 +156,11 @@ namespace netcore::ssl {
             switch (ssl.get_error(ret)) {
                 case SSL_ERROR_WANT_READ:
                     TIMBER_TRACE("{} wants to read while writing", *this);
-                    co_await event.wait(EPOLLIN, nullptr);
+                    co_await event.in();
                     break;
                 case SSL_ERROR_WANT_WRITE:
                     TIMBER_TRACE("{} wants to write", *this);
-                    co_await event.wait(EPOLLOUT, nullptr);
+                    co_await event.out();
                     break;
                 default:
                     throw error("SSL socket failed to write data");

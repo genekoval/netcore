@@ -1,35 +1,38 @@
 #pragma once
 
+#include "bidirectional_event.hpp"
 #include "fd.hpp"
-#include "system_event.hpp"
 
 #include <ext/coroutine>
 #include <fmt/format.h>
 #include <sstream>
 #include <string>
+#include <sys/socket.h>
 
 namespace netcore {
     class socket {
         fd descriptor;
         bool error = false;
-        system_event event;
+        bidirectional_event event;
 
         [[noreturn]]
         auto failure(const char* message) -> void;
     public:
         socket() = default;
-        socket(int fd, uint32_t events);
-        socket(int domain, int type, int protocol, uint32_t events);
+
+        explicit socket(int fd);
+
+        socket(int domain, int type, int protocol);
 
         operator int() const;
 
         auto cancel() noexcept -> void;
 
+        auto connect(const sockaddr* addr, socklen_t len) -> ext::task<bool>;
+
         auto end() const -> void;
 
         auto failed() const noexcept -> bool;
-
-        auto notify() -> void;
 
         auto read(
             void* dest,
@@ -46,8 +49,6 @@ namespace netcore {
         auto try_read(void* dest, std::size_t len) -> long;
 
         auto valid() const -> bool;
-
-        auto wait(uint32_t events = 0) -> ext::task<>;
 
         auto write(
             const void* src,

@@ -19,6 +19,8 @@ namespace netcore {
         std::optional<ext::group> group;
 
         auto apply_permissions() const -> void;
+
+        auto remove() const noexcept -> void;
     };
 
     using endpoint = std::variant<inet_socket, unix_socket>;
