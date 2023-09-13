@@ -1,14 +1,14 @@
 #pragma once
 
 #include "fd.hpp"
-#include "system_event.hpp"
+#include "runtime.hpp"
 
 namespace netcore {
     class eventfd_handle;
 
     class eventfd {
         fd descriptor;
-        system_event event;
+        std::shared_ptr<runtime::event> event;
     public:
         eventfd();
 

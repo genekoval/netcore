@@ -26,8 +26,6 @@ namespace netcore {
 
         auto operator=(buffered_socket&& other) -> buffered_socket&;
 
-        operator int() const;
-
         auto cancel() noexcept -> void;
 
         auto connected() -> bool;
@@ -35,6 +33,8 @@ namespace netcore {
         auto consume(std::size_t len) -> void;
 
         auto failed() const noexcept -> bool;
+
+        auto fd() const noexcept -> int;
 
         auto fill_buffer() -> ext::task<bool>;
 
@@ -48,7 +48,10 @@ namespace netcore {
 
         auto read(void* dest, std::size_t len) -> ext::task<>;
 
-        auto sendfile(const fd& descriptor, std::size_t count) -> ext::task<>;
+        auto sendfile(
+            const netcore::fd& descriptor,
+            std::size_t count
+        ) -> ext::task<>;
 
         auto write(const void* src, std::size_t len) -> ext::task<>;
     };

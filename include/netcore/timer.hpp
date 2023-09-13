@@ -1,7 +1,7 @@
 #pragma once
 
 #include "fd.hpp"
-#include "system_event.hpp"
+#include "runtime.hpp"
 
 #include <chrono>
 #include <fmt/format.h>
@@ -11,7 +11,7 @@ namespace netcore {
         friend struct fmt::formatter<timer>;
 
         fd descriptor;
-        system_event event;
+        std::shared_ptr<runtime::event> event;
 
         timer(int clockid);
     public:

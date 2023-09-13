@@ -10,7 +10,7 @@ namespace netcore {
             type | SOCK_NONBLOCK | SOCK_CLOEXEC,
             protocol
         )),
-        event(descriptor)
+        event(runtime::event::create(descriptor, EPOLLIN))
     {
         if (!descriptor.valid()) {
             throw ext::system_error("Failed to create server socket");
@@ -32,7 +32,7 @@ namespace netcore {
             if (client != -1) co_return socket(client);
 
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                if (!co_await event.in()) co_return socket();
+                if (!co_await event->in()) co_return socket();
             }
             else throw ext::system_error(fmt::format(
                 "Failed to accept client connection on {}",
@@ -95,7 +95,7 @@ namespace netcore {
     }
 
     auto server_socket::cancel() -> void {
-        event.cancel();
+        event->cancel();
     }
 
     auto server_socket::fd() const noexcept -> int {

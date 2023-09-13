@@ -50,7 +50,7 @@ namespace netcore {
 
     timer::timer(int clockid) :
         descriptor(timerfd_create(clockid, TFD_NONBLOCK | TFD_CLOEXEC)),
-        event(descriptor)
+        event(runtime::event::create(descriptor, EPOLLIN))
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create timer");
@@ -65,9 +65,7 @@ namespace netcore {
             .interval = nanoseconds::zero()
         });
 
-        event.cancel();
-
-        TIMBER_TRACE("{} disarmed", *this);
+        event->cancel();
     }
 
     auto timer::get() const -> time {
@@ -97,7 +95,7 @@ namespace netcore {
             throw ext::system_error("failed to set timer");
         }
 
-        TIMBER_TRACE(
+        TIMBER_DEBUG(
             "{} set for {:L}ns{}",
             *this,
             t.value.count(),
@@ -115,19 +113,22 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (co_await event.in()) continue;
-                    else co_return 0;
+                    if (co_await event->in()) continue;
+                    else {
+                        TIMBER_DEBUG("{} disarmed", *this);
+                        co_return 0;
+                    }
                 }
 
                 throw ext::system_error("Failed to read timer value");
             }
         } while (retval != sizeof(expirations));
 
-        TIMBER_TRACE("{} expirations: {:L}", *this, expirations);
+        TIMBER_DEBUG("{} expirations: {:L}", *this, expirations);
         co_return expirations;
     }
 
     auto timer::waiting() const noexcept -> bool {
-        return event.awaiting();
+        return event->awaiting_in != nullptr;
     }
 }

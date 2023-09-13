@@ -49,7 +49,7 @@ namespace netcore {
         address_type addr;
 
         auto handle_connection(netcore::socket&& client) -> ext::detached_task {
-            const auto fd = static_cast<int>(client);
+            const auto fd = client.fd();
             const auto counter_guard = connection_counter.increment();
 
             TIMBER_DEBUG(

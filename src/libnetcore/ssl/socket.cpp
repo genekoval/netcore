@@ -14,16 +14,16 @@ namespace {
 }
 
 namespace netcore::ssl {
-    socket::socket(fd&& descriptor, netcore::ssl::ssl&& ssl) :
-        descriptor(std::forward<fd>(descriptor)),
-        event(this->descriptor),
+    socket::socket(
+        netcore::fd&& descriptor,
+        std::shared_ptr<runtime::event>&& event,
+        netcore::ssl::ssl&& ssl
+    ) :
+        descriptor(std::forward<netcore::fd>(descriptor)),
+        event(std::forward<std::shared_ptr<runtime::event>>(event)),
         ssl(std::forward<netcore::ssl::ssl>(ssl))
     {
         this->ssl.set_fd(this->descriptor);
-    }
-
-    socket::operator int() const {
-        return descriptor;
     }
 
     auto socket::accept() -> ext::task<std::string_view> {
@@ -33,10 +33,10 @@ namespace netcore::ssl {
 
             switch (ssl.get_error(ret)) {
                 case SSL_ERROR_WANT_READ:
-                    co_await event.in();
+                    if (!co_await event->in()) throw task_canceled();
                     break;
                 case SSL_ERROR_WANT_WRITE:
-                    co_await event.out();
+                    if (!co_await event->out()) throw task_canceled();
                     break;
                 default:
                     throw error(
@@ -66,13 +66,21 @@ namespace netcore::ssl {
         co_return protocol;
     }
 
+    auto socket::fd() const noexcept -> int {
+        return descriptor;
+    }
+
     auto socket::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
         while (true) {
             const auto ret = try_read(dest, len);
             if (ret >= 0) co_return ret;
 
-            if (ret == -1) co_await event.in();
-            else co_await event.out();
+            if (ret == -1) {
+                if (!co_await event->in()) co_return 0;
+            }
+            else {
+                if (!co_await event->out()) co_return 0;
+            }
         }
     }
 
@@ -156,11 +164,11 @@ namespace netcore::ssl {
             switch (ssl.get_error(ret)) {
                 case SSL_ERROR_WANT_READ:
                     TIMBER_TRACE("{} wants to read while writing", *this);
-                    co_await event.in();
+                    if (!co_await event->in()) throw task_canceled();
                     break;
                 case SSL_ERROR_WANT_WRITE:
                     TIMBER_TRACE("{} wants to write", *this);
-                    co_await event.out();
+                    if (!co_await event->out()) throw task_canceled();
                     break;
                 default:
                     throw error("SSL socket failed to write data");

@@ -29,8 +29,8 @@ namespace netcore::ssl {
         return *this;
     }
 
-    buffered_socket::operator int() const {
-        return inner;
+    auto buffered_socket::fd() const noexcept -> int {
+        return inner.fd();
     }
 
     auto buffered_socket::flush() -> ext::task<> {

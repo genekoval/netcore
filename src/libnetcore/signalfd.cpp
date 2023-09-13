@@ -11,7 +11,7 @@
 namespace netcore {
     signalfd::signalfd(int descriptor) :
         descriptor(descriptor),
-        event(this->descriptor)
+        event(runtime::event::create(this->descriptor, EPOLLIN))
     {
         TIMBER_TRACE("signalfd ({}) created", descriptor);
     }
@@ -45,7 +45,7 @@ namespace netcore {
             if (bytes == sizeof(info)) co_return info.ssi_signo;
 
             if (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                if (!co_await event.in()) co_return 0;
+                if (!co_await event->in()) co_return 0;
             }
             else throw ext::system_error("Failed to read signal info");
         }

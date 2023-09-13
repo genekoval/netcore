@@ -19,47 +19,63 @@ namespace netcore {
         detail::awaiter_queue pending;
         unsigned long awaiters = 0;
     public:
-        class awaiter {
-            int descriptor = -1;
+        class event : public std::enable_shared_from_this<event> {
+            int descriptor;
+            std::uint32_t received;
             bool canceled = false;
-            std::uint32_t submission = 0;
-            std::uint32_t completion = 0;
-            std::coroutine_handle<> coroutine;
+
+            event(int fd, std::uint32_t events) noexcept;
         public:
-            awaiter() = default;
+            class awaitable {
+                runtime::event& event;
+                std::coroutine_handle<>& coroutine;
+            public:
+                awaitable(
+                    runtime::event& event,
+                    std::coroutine_handle<>& coroutine
+                ) noexcept;
 
-            awaiter(int fd) noexcept;
+                ~awaitable();
 
-            awaiter(const awaiter&) = delete;
+                auto await_ready() const noexcept -> bool;
 
-            awaiter(awaiter&& other);
+                auto await_suspend(std::coroutine_handle<> coroutine) -> void;
 
-            ~awaiter();
+                [[nodiscard]]
+                auto await_resume() noexcept -> std::uint32_t;
+            };
 
-            auto operator=(const awaiter&) -> awaiter& = delete;
+            static auto create(
+                int fd,
+                std::uint32_t events
+            ) noexcept -> std::shared_ptr<event>;
 
-            auto operator=(awaiter&& other) -> awaiter&;
+            std::uint32_t events;
+            std::coroutine_handle<> awaiting_in;
+            std::coroutine_handle<> awaiting_out;
 
-            auto add(std::uint32_t events) -> void;
+            event(const event&) = delete;
 
-            auto awaiting() const noexcept -> bool;
+            event(event&& other) = delete;
 
-            auto await_ready() const noexcept -> bool;
+            auto operator=(const event&) -> event& = delete;
 
-            auto await_suspend(std::coroutine_handle<> coroutine) -> void;
-
-            auto await_resume() noexcept -> std::uint32_t;
+            auto operator=(event&& other) -> event& = delete;
 
             auto cancel() -> void;
 
-            auto events() const noexcept -> std::uint32_t;
-
             auto fd() const noexcept -> int;
 
-            auto resume(std::uint32_t events) -> void;
+            auto in() noexcept -> awaitable;
 
-            auto set(std::uint32_t events) -> void;
+            auto out() noexcept -> awaitable;
+
+            auto remove() const noexcept -> std::error_code;
+
+            auto resume(std::uint32_t events) -> void;
         };
+
+        friend class event::awaitable;
 
         static auto active() -> bool;
 
@@ -71,7 +87,7 @@ namespace netcore {
 
         ~runtime();
 
-        auto add(awaiter* a) -> void;
+        auto add(runtime::event* event) -> void;
 
         auto run() -> void;
 
@@ -79,9 +95,9 @@ namespace netcore {
 
         auto enqueue(detail::awaiter_queue& awaiters) -> void;
 
-        auto modify(awaiter* a) -> void;
+        auto modify(runtime::event* event) -> void;
 
-        auto remove(int fd) -> void;
+        auto remove(int fd) const noexcept -> std::error_code;
     };
 
     auto run() -> void;

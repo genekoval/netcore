@@ -1,7 +1,7 @@
 #pragma once
 
-#include "bidirectional_event.hpp"
 #include "fd.hpp"
+#include "runtime.hpp"
 
 #include <ext/coroutine>
 #include <fmt/format.h>
@@ -11,9 +11,9 @@
 
 namespace netcore {
     class socket {
-        fd descriptor;
+        netcore::fd descriptor;
         bool error = false;
-        bidirectional_event event;
+        std::shared_ptr<runtime::event> event;
 
         [[noreturn]]
         auto failure(const char* message) -> void;
@@ -24,8 +24,6 @@ namespace netcore {
 
         socket(int domain, int type, int protocol);
 
-        operator int() const;
-
         auto cancel() noexcept -> void;
 
         auto connect(const sockaddr* addr, socklen_t len) -> ext::task<bool>;
@@ -34,17 +32,20 @@ namespace netcore {
 
         auto failed() const noexcept -> bool;
 
+        auto fd() const noexcept -> int;
+
         auto read(
             void* dest,
             std::size_t len
         ) -> ext::task<std::size_t>;
 
+        auto release() ->
+            std::pair<netcore::fd, std::shared_ptr<runtime::event>>;
+
         auto sendfile(
-            const fd& descriptor,
+            const netcore::fd& descriptor,
             std::size_t count
         ) -> ext::task<>;
-
-        auto take() -> fd;
 
         auto try_read(void* dest, std::size_t len) -> long;
 
@@ -66,6 +67,6 @@ struct fmt::formatter<netcore::socket> {
 
     template <typename FormatContext>
     auto format(const netcore::socket& socket, FormatContext& ctx) {
-        return format_to(ctx.out(), "socket ({})", static_cast<int>(socket));
+        return format_to(ctx.out(), "socket ({})", socket.fd());
     }
 };

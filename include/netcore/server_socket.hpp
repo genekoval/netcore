@@ -3,13 +3,13 @@
 #include "address.hpp"
 #include "endpoint.hpp"
 #include "fd.hpp"
+#include "runtime.hpp"
 #include "socket.h"
-#include "system_event.hpp"
 
 namespace netcore {
     class server_socket {
-        fd descriptor;
-        system_event event;
+        netcore::fd descriptor;
+        std::shared_ptr<runtime::event> event;
         address_type addr;
     public:
         server_socket(int domain, int type, int protocol);

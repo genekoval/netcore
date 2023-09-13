@@ -30,10 +30,6 @@ namespace netcore {
         return *this;
     }
 
-    buffered_socket::operator int() const {
-        return inner;
-    }
-
     auto buffered_socket::cancel() noexcept -> void {
         inner.cancel();
     }
@@ -58,6 +54,10 @@ namespace netcore {
 
     auto buffered_socket::failed() const noexcept -> bool {
         return inner.failed();
+    }
+
+    auto buffered_socket::fd() const noexcept -> int {
+        return inner.fd();
     }
 
     auto buffered_socket::fill_buffer() -> ext::task<bool> {
@@ -87,7 +87,7 @@ namespace netcore {
     }
 
     auto buffered_socket::sendfile(
-        const fd& descriptor,
+        const netcore::fd& descriptor,
         std::size_t count
     ) -> ext::task<> {
         co_await flush();

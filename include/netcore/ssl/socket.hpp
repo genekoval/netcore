@@ -2,24 +2,28 @@
 
 #include "ssl.hpp"
 
-#include <netcore/bidirectional_event.hpp>
 #include <netcore/fd.hpp>
+#include <netcore/runtime.hpp>
 
 #include <fmt/format.h>
 
 namespace netcore::ssl {
     class socket {
-        fd descriptor;
-        bidirectional_event event;
+        netcore::fd descriptor;
+        std::shared_ptr<runtime::event> event;
         netcore::ssl::ssl ssl;
     public:
         socket() = default;
 
-        socket(fd&& descriptor, netcore::ssl::ssl&& ssl);
-
-        operator int() const;
+        socket(
+            netcore::fd&& descriptor,
+            std::shared_ptr<runtime::event>&& event,
+            netcore::ssl::ssl&& ssl
+        );
 
         auto accept() -> ext::task<std::string_view>;
+
+        auto fd() const noexcept -> int;
 
         auto read(void* dest, std::size_t len) -> ext::task<std::size_t>;
 
@@ -46,7 +50,7 @@ struct fmt::formatter<netcore::ssl::socket> {
         return format_to(
             ctx.out(),
             "SSL socket ({})",
-            static_cast<int>(socket)
+            socket.fd()
         );
     }
 };

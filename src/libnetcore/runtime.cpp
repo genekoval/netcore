@@ -50,48 +50,46 @@ namespace netcore {
         TIMBER_TRACE("{} destroyed", *this);
     }
 
-    auto runtime::add(awaiter* a) -> void {
+    auto runtime::add(runtime::event* event) -> void {
         auto ev = epoll_event {
-            .events = a->events() | permanent_events,
+            .events = event->events | permanent_events,
             .data = {
-                .ptr = a
+                .ptr = event
             }
         };
 
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_ADD,
-            a->fd(),
+            event->fd(),
             &ev
         ) == -1) {
-            TIMBER_DEBUG("{} failed to add entry ({})", *this, a->fd());
+            TIMBER_DEBUG("{} failed to add entry ({})", *this, event->fd());
             throw ext::system_error("Failed to add entry to interest list");
         }
 
-        ++awaiters;
-
-        TIMBER_TRACE("{} added entry ({})", *this, a->fd());
+        TIMBER_TRACE("{} added entry ({})", *this, event->fd());
     }
 
-    auto runtime::modify(awaiter* a) -> void {
+    auto runtime::modify(runtime::event* event) -> void {
         auto ev = epoll_event {
-            .events = a->events() | permanent_events,
+            .events = event->events | permanent_events,
             .data = {
-                .ptr = a
+                .ptr = event
             }
         };
 
         if (epoll_ctl(
             descriptor,
             EPOLL_CTL_MOD,
-            a->fd(),
+            event->fd(),
             &ev
         ) == -1) {
-            TIMBER_DEBUG("{} failed to modify entry ({})", *this, a->fd());
+            TIMBER_DEBUG("{} failed to modify entry ({})", *this, event->fd());
             throw ext::system_error("Failed to modify runtime entry");
         }
 
-        TIMBER_TRACE("{} modified entry ({})", *this, a->fd());
+        TIMBER_TRACE("{} modified entry ({})", *this, event->fd());
     }
 
     auto runtime::enqueue(detail::awaiter& a) -> void {
@@ -102,15 +100,23 @@ namespace netcore {
         pending.enqueue(awaiters);
     }
 
-    auto runtime::remove(int fd) -> void {
-        --awaiters;
-
+    auto runtime::remove(int fd) const noexcept -> std::error_code {
         if (epoll_ctl(descriptor, EPOLL_CTL_DEL, fd, nullptr) == -1) {
-            TIMBER_DEBUG("{} failed to remove entry ({})", *this, fd);
-            throw ext::system_error("Failed to remove entry in interest list");
+            auto error = std::error_code(errno, std::generic_category());
+
+            TIMBER_DEBUG(
+                "{} failed to remove entry ({}): {}",
+                *this,
+                fd,
+                error.message()
+            );
+
+            return error;
         }
 
         TIMBER_TRACE("{} removed entry ({})", *this, fd);
+
+        return {};
     }
 
     auto runtime::run() -> void {
@@ -157,9 +163,9 @@ namespace netcore {
             }
 
             for (auto i = 0; i < ready; ++i) {
-                const auto& event = events[i];
-                auto* a = static_cast<awaiter*>(event.data.ptr);
-                a->resume(event.events);
+                const auto& current = events[i];
+                auto& event = *static_cast<runtime::event*>(current.data.ptr);
+                event.resume(current.events);
             }
 
             TIMBER_DEBUG(
@@ -174,98 +180,116 @@ namespace netcore {
         TIMBER_TRACE("{} stopped", *this);
     }
 
-    runtime::awaiter::awaiter(int fd) noexcept : descriptor(fd) {}
-
-    runtime::awaiter::awaiter(awaiter&& other) :
-        descriptor(std::exchange(other.descriptor, -1)),
-        submission(std::exchange(other.submission, 0)),
-        completion(std::exchange(other.completion, 0)),
-        coroutine(std::exchange(other.coroutine, nullptr))
+    runtime::event::event(int fd, std::uint32_t events) noexcept :
+        descriptor(fd),
+        events(events)
     {
-        if (coroutine) runtime::current().modify(this);
-    }
-
-    runtime::awaiter::~awaiter() {
-        if (coroutine) {
-            try {
-                runtime::current().remove(descriptor);
-            }
-            catch (const std::exception& ex) {
-                TIMBER_ERROR(ex.what());
-            }
-        }
-    }
-
-    auto runtime::awaiter::operator=(awaiter&& other) -> awaiter& {
-        if (std::addressof(other) != this) {
-            std::destroy_at(this);
-            std::construct_at(this, std::move(other));
-        }
-
-        return *this;
-    }
-
-    auto runtime::awaiter::add(std::uint32_t events) -> void {
-        set(submission | events);
-    }
-
-    auto runtime::awaiter::awaiting() const noexcept -> bool {
-        return coroutine != nullptr;
-    }
-
-    auto runtime::awaiter::await_ready() const noexcept -> bool {
-        return canceled;
-    }
-
-    auto runtime::awaiter::await_suspend(
-        std::coroutine_handle<> coroutine
-    ) -> void {
-        TIMBER_TRACE("fd ({}) suspended", descriptor);
-
         runtime::current().add(this);
-        this->coroutine = coroutine;
+        this->events = 0;
     }
 
-    auto runtime::awaiter::await_resume() noexcept -> std::uint32_t {
-        TIMBER_TRACE(
-            "fd ({}) {}",
-            descriptor,
-            canceled ? "canceled" : "resumed"
-        );
-
-        if (coroutine) runtime::current().remove(descriptor);
-
-        coroutine = nullptr;
-        canceled = false;
-
-        return std::exchange(completion, 0);
-    }
-
-    auto runtime::awaiter::cancel() -> void {
+    auto runtime::event::cancel() -> void {
+        const auto handle = shared_from_this();
         canceled = true;
-        if (coroutine) coroutine.resume();
+
+        if (awaiting_in) awaiting_in.resume();
+        if (awaiting_out) awaiting_out.resume();
     }
 
-    auto runtime::awaiter::events() const noexcept -> std::uint32_t {
-        return submission;
+    auto runtime::event::create(
+        int fd,
+        std::uint32_t events
+    ) noexcept -> std::shared_ptr<event> {
+        return std::shared_ptr<event>(new event(fd, events));
     }
 
-    auto runtime::awaiter::fd() const noexcept -> int {
+    auto runtime::event::fd() const noexcept -> int {
         return descriptor;
     }
 
-    auto runtime::awaiter::resume(std::uint32_t events) -> void {
-        completion = events;
-        if (coroutine) coroutine.resume();
+    auto runtime::event::in() noexcept -> awaitable {
+        return awaitable(*this, awaiting_in);
     }
 
-    auto runtime::awaiter::set(std::uint32_t events) -> void {
-        const auto submission = this->submission;
-        this->submission = events;
+    auto runtime::event::out() noexcept -> awaitable {
+        return awaitable(*this, awaiting_out);
+    }
 
-        if (coroutine && this->submission != submission) {
-            runtime::current().modify(this);
+    auto runtime::event::remove() const noexcept -> std::error_code {
+        return runtime::current().remove(descriptor);
+    }
+
+    auto runtime::event::resume(std::uint32_t events) -> void {
+        const auto handle = shared_from_this();
+        received = events;
+
+        if (this->events) {
+            if (awaiting_out && (
+                ((this->events & EPOLLIN) && (events & EPOLLIN)) ||
+                ((this->events & EPOLLOUT) && (events & EPOLLOUT))
+            )) awaiting_out.resume();
+
+            return;
         }
+
+        if ((events & EPOLLIN) && awaiting_in) awaiting_in.resume();
+        if ((events & EPOLLOUT) && awaiting_out) awaiting_out.resume();
+    }
+
+    runtime::event::awaitable::awaitable(
+        runtime::event& event,
+        std::coroutine_handle<>& coroutine
+    ) noexcept :
+        event(event),
+        coroutine(coroutine)
+    {}
+
+    runtime::event::awaitable::~awaitable() {
+        if (!coroutine) return;
+
+        coroutine = nullptr;
+
+        if (!(event.awaiting_in || event.awaiting_out)) {
+            --runtime::current().awaiters;
+        }
+    }
+
+    auto runtime::event::awaitable::await_ready() const noexcept -> bool {
+        return event.canceled;
+    }
+
+    auto runtime::event::awaitable::await_suspend(
+        std::coroutine_handle<> coroutine
+    ) -> void {
+        TIMBER_TRACE("fd ({}) suspended", event.descriptor);
+
+        if (!(event.awaiting_in || event.awaiting_out)) {
+            ++runtime::current().awaiters;
+        }
+
+        this->coroutine = coroutine;
+    }
+
+    auto runtime::event::awaitable::await_resume() noexcept -> std::uint32_t {
+        if (coroutine) {
+            coroutine = nullptr;
+
+            if (!(event.awaiting_in || event.awaiting_out)) {
+                --runtime::current().awaiters;
+            }
+        }
+
+
+        const auto canceled = event.canceled;
+        if (!(event.awaiting_in || event.awaiting_out)) event.canceled = false;
+
+        TIMBER_TRACE(
+            "fd ({}) {}",
+            event.descriptor,
+            canceled ? "canceled" : "resumed"
+        );
+
+        return canceled ? 0 : event.received;
     }
 
     auto run() -> void {

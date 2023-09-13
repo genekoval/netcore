@@ -8,7 +8,7 @@
 namespace netcore {
     eventfd::eventfd() :
         descriptor(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)),
-        event(descriptor)
+        event(runtime::event::create(descriptor, EPOLLIN))
     {
         if (!descriptor.valid()) {
             throw ext::system_error("Failed to create eventfd");
@@ -30,7 +30,7 @@ namespace netcore {
 
             if (retval == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (co_await event.in()) continue;
+                    if (co_await event->in()) continue;
                     else co_return 0;
                 }
 

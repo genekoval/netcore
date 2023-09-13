@@ -1,3 +1,4 @@
+#include <netcore/except.hpp>
 #include <netcore/proc/process.hpp>
 
 #include <ext/except.h>
@@ -42,7 +43,7 @@ namespace netcore::proc {
     process::process(pid_t pid) :
         id(pid),
         descriptor(syscall(SYS_pidfd_open, id, PIDFD_NONBLOCK)),
-        event(descriptor)
+        event(runtime::event::create(descriptor, EPOLLIN))
     {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to open pid fd");
@@ -85,7 +86,9 @@ namespace netcore::proc {
 
         do {
             if (waitid(P_PIDFD, descriptor, &siginfo, states) == -1) {
-                if (errno == EAGAIN) co_await event.in();
+                if (errno == EAGAIN) {
+                    if (!co_await event->in()) throw task_canceled();
+                }
                 else throw ext::system_error(fmt::format(
                     "failed to wait for process with PID {}",
                     id

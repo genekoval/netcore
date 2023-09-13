@@ -1,3 +1,4 @@
+#include <netcore/except.hpp>
 #include <netcore/socket.h>
 
 #include <cstring>
@@ -11,7 +12,10 @@
 #include <utility>
 
 namespace netcore {
-    socket::socket(int fd) : descriptor(fd), event(fd) {
+    socket::socket(int fd) :
+        descriptor(fd),
+        event(runtime::event::create(fd, EPOLLIN | EPOLLOUT))
+    {
         TIMBER_TRACE("{} created", *this);
     }
 
@@ -27,10 +31,8 @@ namespace netcore {
         }
     }
 
-    socket::operator int() const { return descriptor; }
-
     auto socket::cancel() noexcept -> void {
-        event.cancel();
+        event->cancel();
     }
 
     auto socket::connect(
@@ -39,7 +41,9 @@ namespace netcore {
     ) -> ext::task<bool> {
         while (true) {
             if (::connect(descriptor, addr, len) == 0) co_return true;
-            if (errno == EINPROGRESS) co_await event.out();
+            if (errno == EINPROGRESS) {
+                if (!co_await event->out()) throw task_canceled();
+            }
             else co_return false;
         }
     }
@@ -62,6 +66,10 @@ namespace netcore {
         throw ext::system_error(message);
     }
 
+    auto socket::fd() const noexcept -> int {
+        return descriptor;
+    }
+
     auto socket::read(
         void* dest,
         std::size_t len
@@ -70,7 +78,9 @@ namespace netcore {
 
         do {
             bytes_read = try_read(dest, len);
-            if (bytes_read == -1) co_await event.in();
+            if (bytes_read == -1) {
+                if (!co_await event->in()) throw task_canceled();
+            }
         } while (bytes_read == -1);
 
         TIMBER_TRACE(
@@ -83,8 +93,14 @@ namespace netcore {
         co_return bytes_read;
     }
 
+    auto socket::release() ->
+        std::pair<netcore::fd, std::shared_ptr<runtime::event>>
+    {
+        return {std::move(descriptor), std::move(event)};
+    }
+
     auto socket::sendfile(
-        const fd& descriptor,
+        const netcore::fd& descriptor,
         std::size_t count
     ) -> ext::task<> {
         auto sent = std::size_t();
@@ -100,7 +116,7 @@ namespace netcore {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await event.out();
+                    if (!co_await event->out()) throw task_canceled();
                     continue;
                 }
 
@@ -113,10 +129,6 @@ namespace netcore {
                 "{} send {} bytes (sendfile [{}/{}])", *this, bytes, sent, count
             );
         }
-    }
-
-    auto socket::take() -> fd {
-        return std::exchange(descriptor, {});
     }
 
     auto socket::try_read(void* dest, std::size_t len) -> long {
@@ -142,7 +154,7 @@ namespace netcore {
 
             if (bytes_written == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await event.out();
+                    if (!co_await event->out()) throw task_canceled();
                 }
                 else failure("failed to send data");
             }

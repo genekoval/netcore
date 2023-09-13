@@ -100,7 +100,12 @@ namespace netcore::ssl {
     }
 
     auto context::wrap(netcore::socket&& socket) -> netcore::ssl::socket {
-        auto s = new_ssl();
-        return netcore::ssl::socket(socket.take(), std::move(s));
+        auto [fd, event] = socket.release();
+
+        return netcore::ssl::socket(
+            std::move(fd),
+            std::move(event),
+            new_ssl()
+        );
     }
 }

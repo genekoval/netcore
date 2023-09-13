@@ -1,7 +1,7 @@
 #pragma once
 
 #include <netcore/pipe.hpp>
-#include <netcore/system_event.hpp>
+#include <netcore/runtime.hpp>
 
 #include <array>
 
@@ -28,7 +28,7 @@ namespace netcore::proc {
     class piped : public detail::stdio_base {
         netcore::pipe pipe;
         netcore::fd fd;
-        system_event event;
+        std::shared_ptr<runtime::event> event;
     public:
         piped(int descriptor);
 

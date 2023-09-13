@@ -1,7 +1,7 @@
 #pragma once
 
 #include <netcore/fd.hpp>
-#include <netcore/system_event.hpp>
+#include <netcore/runtime.hpp>
 
 #include <fmt/format.h>
 #include <optional>
@@ -30,7 +30,7 @@ namespace netcore::proc {
 
         pid_t id = 0;
         fd descriptor;
-        system_event event;
+        std::shared_ptr<runtime::event> event;
     public:
         process() = default;
 

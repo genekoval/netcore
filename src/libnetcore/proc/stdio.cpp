@@ -1,4 +1,5 @@
 #include <netcore/proc/stdio.hpp>
+#include <netcore/except.hpp>
 #include <netcore/file.hpp>
 
 #include <ext/except.h>
@@ -80,7 +81,10 @@ namespace netcore::proc {
 
     auto piped::parent() -> void {
         fd = descriptor == STDIN_FILENO ? pipe.write() : pipe.read();
-        event = system_event(fd);
+        event = runtime::event::create(
+            descriptor,
+            descriptor == STDIN_FILENO ? EPOLLIN : EPOLLOUT
+        );
     }
 
     auto piped::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
@@ -91,7 +95,7 @@ namespace netcore::proc {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await event.in();
+                    if (!co_await event->in()) throw task_canceled();
                 }
                 else {
                     TIMBER_DEBUG("fd ({}) failed to read data", fd);
@@ -121,7 +125,7 @@ namespace netcore::proc {
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    co_await event.out();
+                    if (!co_await event->out()) throw task_canceled();
                 }
                 else {
                     TIMBER_DEBUG("fd ({}) failed to write data", fd);
