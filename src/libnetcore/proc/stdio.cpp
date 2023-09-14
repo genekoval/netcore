@@ -93,8 +93,8 @@ namespace netcore::proc {
     auto piped::parent() -> void {
         fd = descriptor == STDIN_FILENO ? pipe.write() : pipe.read();
         event = runtime::event::create(
-            descriptor,
-            descriptor == STDIN_FILENO ? EPOLLIN : EPOLLOUT
+            fd,
+            descriptor == STDIN_FILENO ? EPOLLOUT : EPOLLIN
         );
     }
 
