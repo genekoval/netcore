@@ -104,23 +104,23 @@ namespace netcore {
 
     template <typename R>
     auto run(ext::task<R>&& task) -> R {
-        auto wrapper = [](ext::task<R>&& task) -> ext::jtask<R> {
+        const auto start = [&task]() -> ext::jtask<R> {
             co_return co_await std::move(task);
         };
 
-        auto wrapper_task = ext::jtask<>();
+        auto wrapper = ext::jtask<R>();
 
         if (runtime::active()) {
-            wrapper_task = wrapper(std::forward<ext::task<R>>(task));
+            wrapper = start();
             runtime::current().run();
         }
         else {
             auto runtime = netcore::runtime();
-            wrapper_task = wrapper(std::forward<ext::task<R>>(task));
+            wrapper = start();
             runtime.run();
         }
 
-        return std::move(wrapper_task).result();
+        return std::move(wrapper).result();
     }
 
     auto yield() -> ext::task<>;
