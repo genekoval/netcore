@@ -32,6 +32,12 @@ namespace netcore::proc {
     public:
         piped(int descriptor);
 
+        piped(piped&& other) = default;
+
+        ~piped();
+
+        auto operator=(piped&& other) -> piped& = default;
+
         auto child() -> void;
 
         auto close() -> void;

@@ -59,6 +59,17 @@ namespace netcore::proc {
 
     piped::piped(int descriptor) : stdio_base(descriptor) {}
 
+    piped::~piped() {
+        if (!event) return;
+
+        if (const auto error = event->remove()) {
+            TIMBER_ERROR(
+                "Failed to remove file descriptor from runtime: {}",
+                error.message()
+            );
+        }
+    }
+
     auto piped::child() -> void {
         fd = descriptor == STDIN_FILENO ? pipe.read() : pipe.write();
 

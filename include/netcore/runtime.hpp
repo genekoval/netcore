@@ -70,6 +70,7 @@ namespace netcore {
 
             auto out() noexcept -> awaitable;
 
+            [[nodiscard]]
             auto remove() const noexcept -> std::error_code;
 
             auto resume(std::uint32_t events) -> void;
@@ -97,6 +98,7 @@ namespace netcore {
 
         auto modify(runtime::event* event) -> void;
 
+        [[nodiscard]]
         auto remove(int fd) const noexcept -> std::error_code;
     };
 
