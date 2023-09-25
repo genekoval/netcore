@@ -23,6 +23,10 @@ namespace netcore::ssl {
 
         auto accept() -> ext::task<std::string_view>;
 
+        auto await_read() -> ext::task<>;
+
+        auto await_write() -> ext::task<>;
+
         auto fd() const noexcept -> int;
 
         auto read(void* dest, std::size_t len) -> ext::task<std::size_t>;
@@ -30,6 +34,8 @@ namespace netcore::ssl {
         auto shutdown() -> std::optional<int>;
 
         auto try_read(void* dest, std::size_t len) -> long;
+
+        auto try_write(const void* src, std::size_t len) -> long;
 
         auto write(
             const void* src,

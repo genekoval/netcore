@@ -30,6 +30,10 @@ namespace netcore {
         return *this;
     }
 
+    auto buffered_socket::await_write() -> ext::task<> {
+        return writer.await_write();
+    }
+
     auto buffered_socket::cancel() noexcept -> void {
         inner.cancel();
     }
@@ -92,6 +96,13 @@ namespace netcore {
     ) -> ext::task<> {
         co_await flush();
         co_await inner.sendfile(descriptor, count);
+    }
+
+    auto buffered_socket::try_write(
+        const void* src,
+        std::size_t len
+    ) -> std::size_t {
+        return writer.try_write(src, len);
     }
 
     auto buffered_socket::write(

@@ -31,6 +31,14 @@ namespace netcore {
         }
     }
 
+    auto socket::await_read() -> ext::task<> {
+        if (!co_await event->in()) throw task_canceled();
+    }
+
+    auto socket::await_write() -> ext::task<> {
+        if (!co_await event->out()) throw task_canceled();
+    }
+
     auto socket::cancel() noexcept -> void {
         event->cancel();
     }
@@ -78,17 +86,8 @@ namespace netcore {
 
         do {
             bytes_read = try_read(dest, len);
-            if (bytes_read == -1) {
-                if (!co_await event->in()) throw task_canceled();
-            }
+            if (bytes_read == -1) co_await await_read();
         } while (bytes_read == -1);
-
-        TIMBER_TRACE(
-            "{} recv {:L} byte{}",
-            *this,
-            bytes_read,
-            bytes_read == 1 ? "" : "s"
-        );
 
         co_return bytes_read;
     }
@@ -134,11 +133,37 @@ namespace netcore {
     auto socket::try_read(void* dest, std::size_t len) -> long {
         const auto bytes_read = ::recv(descriptor, dest, len, 0);
 
-        if (bytes_read == -1 && (errno != EAGAIN && errno != EWOULDBLOCK)) {
+        if (bytes_read >= 0) {
+            TIMBER_TRACE(
+                "{} recv {:L} byte{}",
+                *this,
+                bytes_read,
+                bytes_read == 1 ? "" : "s"
+            );
+        }
+        else if (errno != EAGAIN && errno != EWOULDBLOCK) {
             failure("failed to receive data");
         }
 
         return bytes_read;
+    }
+
+    auto socket::try_write(const void* src, std::size_t len) -> long {
+        const auto bytes_written = ::send(descriptor, src, len, MSG_NOSIGNAL);
+
+        if (bytes_written >= 0) {
+            TIMBER_TRACE(
+                "{} send {:L} byte{}",
+                *this,
+                bytes_written,
+                bytes_written == 1 ? "" : "s"
+            );
+        }
+        else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            failure("failed to send data");
+        }
+
+        return bytes_written;
     }
 
     auto socket::valid() const -> bool { return descriptor.valid(); }
@@ -150,22 +175,9 @@ namespace netcore {
         auto bytes_written = -1;
 
         do {
-            bytes_written = ::send(descriptor, src, len, MSG_NOSIGNAL);
-
-            if (bytes_written == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (!co_await event->out()) throw task_canceled();
-                }
-                else failure("failed to send data");
-            }
+            bytes_written = try_write(src, len);
+            if (bytes_written == -1) co_await await_write();
         } while (bytes_written == -1);
-
-        TIMBER_TRACE(
-            "{} send {:L} byte{}",
-            *this,
-            bytes_written,
-            bytes_written == 1 ? "" : "s"
-        );
 
         co_return bytes_written;
     }

@@ -24,6 +24,10 @@ namespace netcore {
 
         socket(int domain, int type, int protocol);
 
+        auto await_read() -> ext::task<>;
+
+        auto await_write() -> ext::task<>;
+
         auto cancel() noexcept -> void;
 
         auto connect(const sockaddr* addr, socklen_t len) -> ext::task<bool>;
@@ -48,6 +52,8 @@ namespace netcore {
         ) -> ext::task<>;
 
         auto try_read(void* dest, std::size_t len) -> long;
+
+        auto try_write(const void* src, std::size_t len) -> long;
 
         auto valid() const -> bool;
 

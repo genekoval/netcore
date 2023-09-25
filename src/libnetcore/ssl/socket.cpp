@@ -33,10 +33,10 @@ namespace netcore::ssl {
 
             switch (ssl.get_error(ret)) {
                 case SSL_ERROR_WANT_READ:
-                    if (!co_await event->in()) throw task_canceled();
+                    co_await await_read();
                     break;
                 case SSL_ERROR_WANT_WRITE:
-                    if (!co_await event->out()) throw task_canceled();
+                    co_await await_write();
                     break;
                 default:
                     throw error(
@@ -66,21 +66,24 @@ namespace netcore::ssl {
         co_return protocol;
     }
 
+    auto socket::await_read() -> ext::task<> {
+        if (!co_await event->in()) throw task_canceled();
+    }
+
+    auto socket::await_write() -> ext::task<> {
+        if (!co_await event->out()) throw task_canceled();
+    }
+
     auto socket::fd() const noexcept -> int {
         return descriptor;
     }
 
     auto socket::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
         while (true) {
-            const auto ret = try_read(dest, len);
-            if (ret >= 0) co_return ret;
+            const auto read = try_read(dest, len);
+            if (read >= 0) co_return read;
 
-            if (ret == -1) {
-                if (!co_await event->in()) co_return 0;
-            }
-            else {
-                if (!co_await event->out()) co_return 0;
-            }
+            co_await await_read();
         }
     }
 
@@ -115,18 +118,13 @@ namespace netcore::ssl {
             return ret;
         }
 
-        const auto err = ssl.get_error(ret);
-
-        switch (err) {
+        switch (ssl.get_error(ret)) {
             case SSL_ERROR_ZERO_RETURN:
                 TIMBER_TRACE("{} received EOF", *this);
                 return 0;
             case SSL_ERROR_WANT_READ:
                 TIMBER_TRACE("{} wants to read", *this);
                 return -1;
-            case SSL_ERROR_WANT_WRITE:
-                TIMBER_TRACE("{} wants to write while reading", *this);
-                return -2;
             case SSL_ERROR_SYSCALL:
                 if (ERR_peek_error()) throw error(read_error);
                 if (errno) throw ext::system_error(read_error);
@@ -145,34 +143,36 @@ namespace netcore::ssl {
         }
     }
 
+    auto socket::try_write(const void* src, std::size_t len) -> long {
+        const auto ret = SSL_write(ssl.get(), src, len);
+        if (ret > 0) {
+            TIMBER_TRACE(
+                "{} write {:L} byte{}",
+                *this,
+                ret,
+                ret == 1 ? "" : "s"
+            );
+            return ret;
+        }
+
+        switch (ssl.get_error(ret)) {
+            case SSL_ERROR_WANT_WRITE:
+                TIMBER_TRACE("{} wants to write", *this);
+                return -1;
+            default:
+                throw error("SSL socket failed to write data");
+        }
+    }
+
     auto socket::write(
         const void* src,
         std::size_t len
     ) -> ext::task<std::size_t> {
         while (true) {
-            const auto ret = SSL_write(ssl.get(), src, len);
-            if (ret > 0) {
-                TIMBER_TRACE(
-                    "{} write {:L} byte{}",
-                    *this,
-                    ret,
-                    ret == 1 ? "" : "s"
-                );
-                co_return ret;
-            }
+            const auto written = try_write(src, len);
+            if (written >= 0) co_return written;
 
-            switch (ssl.get_error(ret)) {
-                case SSL_ERROR_WANT_READ:
-                    TIMBER_TRACE("{} wants to read while writing", *this);
-                    if (!co_await event->in()) throw task_canceled();
-                    break;
-                case SSL_ERROR_WANT_WRITE:
-                    TIMBER_TRACE("{} wants to write", *this);
-                    if (!co_await event->out()) throw task_canceled();
-                    break;
-                default:
-                    throw error("SSL socket failed to write data");
-            }
+            co_await await_write();
         }
     }
 }

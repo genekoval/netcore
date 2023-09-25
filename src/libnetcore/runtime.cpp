@@ -223,6 +223,13 @@ namespace netcore {
         const auto handle = shared_from_this();
         received = events;
 
+        TIMBER_TRACE(
+            "fd ({}) received {}{}",
+            descriptor,
+            events & EPOLLIN ? "EPOLLIN " : "",
+            events & EPOLLOUT ? "EPOLLOUT" : ""
+        );
+
         if (this->events) {
             if (awaiting_out && (
                 ((this->events & EPOLLIN) && (events & EPOLLIN)) ||
