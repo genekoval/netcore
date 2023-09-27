@@ -39,6 +39,6 @@ struct fmt::formatter<netcore::server_socket> {
 
     template <typename FormatContext>
     auto format(const netcore::server_socket& socket, FormatContext& ctx) {
-        return format_to(ctx.out(), "server ({})", socket.fd());
+        return fmt::format_to(ctx.out(), "server ({})", socket.fd());
     }
 };

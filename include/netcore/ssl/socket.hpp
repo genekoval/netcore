@@ -53,7 +53,7 @@ struct fmt::formatter<netcore::ssl::socket> {
 
     template <typename FormatContext>
     auto format(const netcore::ssl::socket& socket, FormatContext& ctx) {
-        return format_to(
+        return fmt::format_to(
             ctx.out(),
             "SSL socket ({})",
             socket.fd()

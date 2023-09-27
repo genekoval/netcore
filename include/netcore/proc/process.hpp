@@ -58,12 +58,12 @@ struct fmt::formatter<netcore::proc::state> : formatter<std::string_view> {
         auto it = std::back_inserter(buffer);
 
         switch (state.code) {
-            case code::none: format_to(it, "{}", "<no return state>"); break;
+            case code::none: fmt::format_to(it, "{}", "<no return state>"); break;
             case code::exited:
-                format_to(it, "exited with code {}", state.status);
+                fmt::format_to(it, "exited with code {}", state.status);
                 break;
             default:
-                format_to(
+                fmt::format_to(
                     it,
                     "{} by signal {}",
                     netcore::proc::to_string(state.code),
@@ -88,7 +88,7 @@ struct fmt::formatter<netcore::proc::process> {
 
     template <typename FormatContext>
     auto format(const netcore::proc::process& process, FormatContext& ctx) {
-        return format_to(
+        return fmt::format_to(
             ctx.out() ,
             "process[{}] ({})",
             process.id,

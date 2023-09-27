@@ -73,6 +73,6 @@ struct fmt::formatter<netcore::socket> {
 
     template <typename FormatContext>
     auto format(const netcore::socket& socket, FormatContext& ctx) {
-        return format_to(ctx.out(), "socket ({})", socket.fd());
+        return fmt::format_to(ctx.out(), "socket ({})", socket.fd());
     }
 };

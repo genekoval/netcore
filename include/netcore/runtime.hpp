@@ -135,6 +135,6 @@ struct fmt::formatter<netcore::runtime> {
     }
 
     auto format(const netcore::runtime& runtime, auto& ctx) {
-        return format_to(ctx.out(), "runtime ({})", runtime.descriptor);
+        return fmt::format_to(ctx.out(), "runtime ({})", runtime.descriptor);
     }
 };

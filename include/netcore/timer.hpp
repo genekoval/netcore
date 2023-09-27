@@ -78,7 +78,7 @@ namespace fmt {
 
         template <typename FormatContext>
         auto format(const netcore::timer& timer, FormatContext& ctx) {
-            return format_to(
+            return fmt::format_to(
                 ctx.out(),
                 "timer ({})",
                 static_cast<int>(timer.descriptor)

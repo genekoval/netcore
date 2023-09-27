@@ -46,6 +46,6 @@ struct fmt::formatter<netcore::ssl::buffered_socket> {
         const netcore::ssl::buffered_socket& socket,
         FormatContext& ctx
     ) {
-        return format_to(ctx.out(), "{}", socket.inner);
+        return fmt::format_to(ctx.out(), "{}", socket.inner);
     }
 };

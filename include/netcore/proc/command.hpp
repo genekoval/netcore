@@ -102,10 +102,10 @@ struct fmt::formatter<netcore::proc::arguments> : formatter<std::string_view> {
         auto buffer = memory_buffer();
         auto it = std::back_inserter(buffer);
 
-        format_to(it, "{}", arguments.storage[0]);
+        fmt::format_to(it, "{}", arguments.storage[0]);
 
         for (auto i = 1ul; i < arguments.storage.size(); ++i) {
-            format_to(it, " `{}`", arguments.storage[i]);
+            fmt::format_to(it, " `{}`", arguments.storage[i]);
         }
 
         return formatter<std::string_view>::format(

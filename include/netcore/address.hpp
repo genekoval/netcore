@@ -60,12 +60,12 @@ struct fmt::formatter<netcore::address_type> {
             using T = std::decay_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<T, std::monostate>) {
-                return format_to(ctx.out(), "<no address>");
+                return fmt::format_to(ctx.out(), "<no address>");
             }
             else if constexpr (std::is_same_v<T, std::filesystem::path>) {
-                return format_to(ctx.out(), R"("{}")", arg.native());
+                return fmt::format_to(ctx.out(), R"("{}")", arg.native());
             }
-            else return format_to(ctx.out(), "{}", arg);
+            else return fmt::format_to(ctx.out(), "{}", arg);
         }, addr);
     }
 };
@@ -79,6 +79,6 @@ struct fmt::formatter<netcore::socket_addr> {
 
     template <typename FormatContext>
     auto format(const netcore::socket_addr& addr, FormatContext& ctx) {
-        return format_to(ctx.out(), "{}:{}", addr.host(), addr.port());
+        return fmt::format_to(ctx.out(), "{}:{}", addr.host(), addr.port());
     }
 };
