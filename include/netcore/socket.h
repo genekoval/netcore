@@ -38,18 +38,13 @@ namespace netcore {
 
         auto fd() const noexcept -> int;
 
-        auto read(
-            void* dest,
-            std::size_t len
-        ) -> ext::task<std::size_t>;
+        auto read(void* dest, std::size_t len) -> ext::task<std::size_t>;
 
-        auto release() ->
-            std::pair<netcore::fd, std::shared_ptr<runtime::event>>;
+        auto release()
+            -> std::pair<netcore::fd, std::shared_ptr<runtime::event>>;
 
-        auto sendfile(
-            const netcore::fd& descriptor,
-            std::size_t count
-        ) -> ext::task<>;
+        auto sendfile(const netcore::fd& descriptor, std::size_t count)
+            -> ext::task<>;
 
         auto try_read(void* dest, std::size_t len) -> long;
 
@@ -57,10 +52,7 @@ namespace netcore {
 
         auto valid() const -> bool;
 
-        auto write(
-            const void* src,
-            std::size_t len
-        ) -> ext::task<std::size_t>;
+        auto write(const void* src, std::size_t len) -> ext::task<std::size_t>;
     };
 }
 

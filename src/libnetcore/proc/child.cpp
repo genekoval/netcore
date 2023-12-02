@@ -5,8 +5,7 @@
 namespace netcore::proc {
     child::child(process&& process, stdio_streams&& stdio) :
         proc::process(std::forward<proc::process>(process)),
-        stdio(std::forward<stdio_streams>(stdio))
-    {}
+        stdio(std::forward<stdio_streams>(stdio)) {}
 
     auto child::check_return_code() -> ext::task<> {
         const auto state = co_await wait();
@@ -27,17 +26,11 @@ namespace netcore::proc {
         throw subprocess_error(pid(), state);
     }
 
-    auto child::err() -> stdio_stream& {
-        return stdio[2];
-    }
+    auto child::err() -> stdio_stream& { return stdio[2]; }
 
-    auto child::in() -> stdio_stream& {
-        return stdio[0];
-    }
+    auto child::in() -> stdio_stream& { return stdio[0]; }
 
-    auto child::out() -> stdio_stream& {
-        return stdio[1];
-    }
+    auto child::out() -> stdio_stream& { return stdio[1]; }
 
     auto child::read() -> ext::task<std::string> {
         co_await check_return_code();
@@ -46,17 +39,15 @@ namespace netcore::proc {
 
     subprocess_error::subprocess_error(pid_t pid, proc::state state) :
         runtime_error(fmt::format("Process with PID {} {}", pid, state)),
-        process_state(state)
-    {}
+        process_state(state) {}
 
     subprocess_error::subprocess_error(
         pid_t pid,
         proc::state state,
         std::string&& err
     ) :
-        runtime_error(fmt::format(
-            "Process with PID {} {}: {}", pid, state, err
-        )),
+        runtime_error(fmt::format("Process with PID {} {}: {}", pid, state, err)
+        ),
         process_state(state),
         err_output(std::forward<std::string>(err))
 

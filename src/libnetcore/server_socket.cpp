@@ -5,13 +5,10 @@
 
 namespace netcore {
     server_socket::server_socket(int domain, int type, int protocol) :
-        descriptor(::socket(
-            domain,
-            type | SOCK_NONBLOCK | SOCK_CLOEXEC,
-            protocol
-        )),
-        event(runtime::event::create(descriptor, EPOLLIN))
-    {
+        descriptor(
+            ::socket(domain, type | SOCK_NONBLOCK | SOCK_CLOEXEC, protocol)
+        ),
+        event(runtime::event::create(descriptor, EPOLLIN)) {
         if (!descriptor.valid()) {
             throw ext::system_error("Failed to create server socket");
         }
@@ -34,10 +31,11 @@ namespace netcore {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 if (!co_await event->in()) co_return socket();
             }
-            else throw ext::system_error(fmt::format(
-                "Failed to accept client connection on {}",
-                addr
-            ));
+            else
+                throw ext::system_error(fmt::format(
+                    "Failed to accept client connection on {}",
+                    addr
+                ));
         }
     }
 
@@ -51,12 +49,13 @@ namespace netcore {
         int yes = 1;
 
         if (setsockopt(
-            descriptor,
-            SOL_SOCKET,
-            SO_REUSEADDR,
-            &yes,
-            sizeof(yes)
-        ) == -1) throw ext::system_error("Failed to set socket option");
+                descriptor,
+                SOL_SOCKET,
+                SO_REUSEADDR,
+                &yes,
+                sizeof(yes)
+            ) == -1)
+            throw ext::system_error("Failed to set socket option");
 
         if (::bind(descriptor, address->ai_addr, address->ai_addrlen) == -1) {
             throw ext::system_error(fmt::format(
@@ -80,27 +79,18 @@ namespace netcore {
         const auto string = path.string();
         string.copy(address.sun_path, string.size(), 0);
 
-        if (::bind(
-            descriptor,
-            (sockaddr*) &address,
-            sizeof(address)
-        ) == -1) {
-            throw ext::system_error(fmt::format(
-                R"(Failed to bind socket to path "{}")",
-                string
-            ));
+        if (::bind(descriptor, (sockaddr*) &address, sizeof(address)) == -1) {
+            throw ext::system_error(
+                fmt::format(R"(Failed to bind socket to path "{}")", string)
+            );
         }
 
         TIMBER_DEBUG(R"({} bound to path "{}")", *this, string);
     }
 
-    auto server_socket::cancel() -> void {
-        event->cancel();
-    }
+    auto server_socket::cancel() -> void { event->cancel(); }
 
-    auto server_socket::fd() const noexcept -> int {
-        return descriptor;
-    }
+    auto server_socket::fd() const noexcept -> int { return descriptor; }
 
     auto server_socket::listen(int backlog) -> void {
         if (::listen(descriptor, backlog) == -1) {

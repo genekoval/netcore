@@ -17,8 +17,7 @@ namespace netcore {
     fd::fd(int descriptor) : descriptor(descriptor) {}
 
     fd::fd(fd&& other) noexcept :
-        descriptor(std::exchange(other.descriptor, invalid))
-    {}
+        descriptor(std::exchange(other.descriptor, invalid)) {}
 
     fd::~fd() {
         if (descriptor == invalid) return;
@@ -52,8 +51,6 @@ namespace netcore {
                 std::strerror(errno)
             );
         }
-        else {
-            TIMBER_TRACE("fd ({}) closed", fd);
-        }
+        else { TIMBER_TRACE("fd ({}) closed", fd); }
     }
 }

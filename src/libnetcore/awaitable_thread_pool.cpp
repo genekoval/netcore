@@ -11,8 +11,7 @@ namespace netcore {
         std::size_t backlog_scale_factor
     ) :
         pool(name, size, backlog_scale_factor),
-        task(wait_for_events())
-    {}
+        task(wait_for_events()) {}
 
     auto awaitable_thread_pool::enqueue(node& node) -> void {
         {

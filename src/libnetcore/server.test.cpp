@@ -14,27 +14,23 @@ namespace {
 
     template <typename F>
     concept client_handler = requires(const F& f, netcore::socket&& client) {
-        { f(std::forward<netcore::socket>(client)) } ->
-            std::same_as<ext::task<>>;
+        {
+            f(std::forward<netcore::socket>(client))
+        } -> std::same_as<ext::task<>>;
     };
 
     const netcore::endpoint endpoint = unix_socket {
         .path = fs::temp_directory_path() / "netcore.test.sock",
-        .mode = fs::perms::owner_read | fs::perms::owner_write
-    };
+        .mode = fs::perms::owner_read | fs::perms::owner_write};
 
     struct server_context {
-        auto close() -> void {
-            TIMBER_INFO("Test server closed");
-        }
+        auto close() -> void { TIMBER_INFO("Test server closed"); }
 
         auto connection(netcore::socket client) -> ext::task<> {
             number_type number = 0;
 
-            const auto bytes = co_await client.read(
-                &number,
-                sizeof(number_type)
-            );
+            const auto bytes =
+                co_await client.read(&number, sizeof(number_type));
 
             if (bytes < sizeof(number_type)) co_return;
 
@@ -45,15 +41,10 @@ namespace {
         }
 
         auto listen(const address_type& address) -> void {
-            TIMBER_INFO(
-                "Test server listening for connections on {}",
-                address
-            );
+            TIMBER_INFO("Test server listening for connections on {}", address);
         }
 
-        auto shutdown() -> void {
-            TIMBER_INFO("Test server shutting down");
-        }
+        auto shutdown() -> void { TIMBER_INFO("Test server shutting down"); }
     };
 }
 
@@ -97,7 +88,6 @@ TEST_F(ServerTest, Connection) {
 
         EXPECT_EQ(number + 1, result);
     });
-
 }
 
 TEST_F(ServerTest, ServerInfo) {

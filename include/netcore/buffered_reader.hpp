@@ -52,34 +52,25 @@ namespace netcore {
 
         buffered_reader(Source& source, std::size_t capacity) :
             buffer(capacity),
-            source(&source)
-        {}
+            source(&source) {}
 
-        auto clear() noexcept -> void {
-            buffer.clear();
-        }
+        auto clear() noexcept -> void { buffer.clear(); }
 
-        auto consume(std::size_t len) -> void {
-            buffer.consume(len);
-        }
+        auto consume(std::size_t len) -> void { buffer.consume(len); }
 
         auto done() -> bool {
             if (!buffer.empty()) return false;
 
-            const auto bytes_read = source->try_read(
-                buffer.back(),
-                buffer.available()
-            );
+            const auto bytes_read =
+                source->try_read(buffer.back(), buffer.available());
 
             if (bytes_read > 0) buffer.append(bytes_read);
             return bytes_read == 0;
         }
 
         auto fill_buffer() -> ext::task<bool> {
-            const auto bytes = co_await source->read(
-                buffer.back(),
-                buffer.available()
-            );
+            const auto bytes =
+                co_await source->read(buffer.back(), buffer.available());
 
             buffer.append(bytes);
 

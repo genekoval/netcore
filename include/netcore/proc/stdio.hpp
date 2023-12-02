@@ -46,19 +46,12 @@ namespace netcore::proc {
 
         auto read(void* dest, std::size_t len) -> ext::task<std::size_t>;
 
-        auto write(
-            const void* src,
-            std::size_t len
-        ) -> ext::task<std::size_t>;
+        auto write(const void* src, std::size_t len) -> ext::task<std::size_t>;
     };
 
     using stdio_type = std::variant<inherit, null, piped>;
 
-    enum class stdio {
-        inherit,
-        null,
-        piped
-    };
+    enum class stdio { inherit, null, piped };
 
     class stdio_stream {
         stdio_type type;
@@ -87,8 +80,8 @@ namespace netcore::proc {
             std::size_t bytes = 0;
 
             do {
-                container.resize(bytes_read == 0 ?
-                    scale_factor : bytes_read * scale_factor
+                container.resize(
+                    bytes_read == 0 ? scale_factor : bytes_read * scale_factor
                 );
 
                 bytes = co_await read(

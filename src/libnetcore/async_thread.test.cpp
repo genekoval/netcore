@@ -23,11 +23,10 @@ TEST(AsyncThread, Wait) {
     netcore::run([]() -> ext::task<> {
         auto thread = make_thread();
 
-        const auto id = co_await thread.wait(
-            []() -> ext::task<std::thread::id> {
+        const auto id =
+            co_await thread.wait([]() -> ext::task<std::thread::id> {
                 co_return std::this_thread::get_id();
-            }()
-        );
+            }());
 
         EXPECT_EQ(thread.id(), id);
     }());

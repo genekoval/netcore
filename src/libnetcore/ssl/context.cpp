@@ -7,9 +7,7 @@
 namespace fs = std::filesystem;
 
 namespace netcore::ssl {
-    context::context(const SSL_METHOD* method) :
-        ctx(SSL_CTX_new(method))
-    {
+    context::context(const SSL_METHOD* method) : ctx(SSL_CTX_new(method)) {
         if (!ctx) throw error("Failed to create SSL/TLS context");
     }
 
@@ -21,12 +19,9 @@ namespace netcore::ssl {
     }
 
     context::context(context&& other) :
-        ctx(std::exchange(other.ctx, nullptr))
-    {}
+        ctx(std::exchange(other.ctx, nullptr)) {}
 
-    context::~context() {
-        SSL_CTX_free(ctx);
-    }
+    context::~context() { SSL_CTX_free(ctx); }
 
     auto context::operator=(const context& other) -> context& {
         if (ctx != other.ctx) {
@@ -67,19 +62,15 @@ namespace netcore::ssl {
     }
 
     auto context::private_key(const fs::path& file) -> void {
-        if (SSL_CTX_use_PrivateKey_file(
-            ctx,
-            file.c_str(),
-            SSL_FILETYPE_PEM
-        ) != 1) throw std::runtime_error(fmt::format(
-            "Failed to read private key file '{}'",
-            file.native()
-        ));
+        if (SSL_CTX_use_PrivateKey_file(ctx, file.c_str(), SSL_FILETYPE_PEM) !=
+            1)
+            throw std::runtime_error(fmt::format(
+                "Failed to read private key file '{}'",
+                file.native()
+            ));
     }
 
-    auto context::server() -> context {
-        return context(TLS_server_method());
-    }
+    auto context::server() -> context { return context(TLS_server_method()); }
 
     auto context::set_alpn_select_callback(
         SSL_CTX_alpn_select_cb_func callback,
@@ -102,10 +93,6 @@ namespace netcore::ssl {
     auto context::wrap(netcore::socket&& socket) -> netcore::ssl::socket {
         auto [fd, event] = socket.release();
 
-        return netcore::ssl::socket(
-            std::move(fd),
-            std::move(event),
-            new_ssl()
-        );
+        return netcore::ssl::socket(std::move(fd), std::move(event), new_ssl());
     }
 }

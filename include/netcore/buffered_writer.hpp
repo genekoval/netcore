@@ -19,20 +19,16 @@ namespace netcore {
         netcore::buffer buffer;
         Sink* sink;
 
-        auto try_write_bytes(
-            const std::byte* src,
-            std::size_t len
-        ) -> std::size_t {
+        auto try_write_bytes(const std::byte* src, std::size_t len)
+            -> std::size_t {
             std::size_t total = 0;
 
             if (len >= buffer.capacity()) {
                 if (!try_flush()) return total;
 
                 while (total < len) {
-                    const auto written = sink->try_write(
-                        src + total,
-                        len - total
-                    );
+                    const auto written =
+                        sink->try_write(src + total, len - total);
 
                     if (written == -1) return total;
 
@@ -77,16 +73,11 @@ namespace netcore {
 
         buffered_writer(Sink& sink, std::size_t capacity) :
             buffer(capacity),
-            sink(&sink)
-        {}
+            sink(&sink) {}
 
-        auto await_write() -> ext::task<> {
-            return sink->await_write();
-        }
+        auto await_write() -> ext::task<> { return sink->await_write(); }
 
-        auto clear() -> void {
-            buffer.clear();
-        }
+        auto clear() -> void { buffer.clear(); }
 
         auto flush() -> ext::task<> {
             while (!try_flush()) co_await sink->await_write();
@@ -95,10 +86,8 @@ namespace netcore {
         auto try_flush() -> bool {
             while (!buffer.empty()) {
                 const auto chunk = buffer.data();
-                const auto written = sink->try_write(
-                    chunk.data(),
-                    chunk.size()
-                );
+                const auto written =
+                    sink->try_write(chunk.data(), chunk.size());
 
                 if (written > 0) buffer.consume(written);
                 else if (written == -1) return false;
@@ -118,8 +107,6 @@ namespace netcore {
             return write_bytes(reinterpret_cast<const std::byte*>(src), len);
         }
 
-        auto write_to(Sink& sink) noexcept -> void {
-            this->sink = &sink;
-        }
+        auto write_to(Sink& sink) noexcept -> void { this->sink = &sink; }
     };
 }

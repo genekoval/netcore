@@ -18,8 +18,9 @@
 namespace netcore {
     template <typename T>
     concept server_context = requires(T& t, socket&& client) {
-        { t.connection(std::forward<socket>(client)) } ->
-            std::same_as<ext::task<>>;
+        {
+            t.connection(std::forward<socket>(client))
+        } -> std::same_as<ext::task<>>;
     };
 
     template <typename T>
@@ -86,9 +87,8 @@ namespace netcore {
 
             this->socket = &socket;
             addr = socket.address();
-            const auto deferred = ext::scope_exit([this] {
-                this->socket = nullptr;
-            });
+            const auto deferred =
+                ext::scope_exit([this] { this->socket = nullptr; });
 
             while (true) {
                 try {
@@ -101,8 +101,7 @@ namespace netcore {
                 catch (const ext::system_error& ex) {
                     switch (ex.code().value()) {
                         case ECONNABORTED:
-                        case EPERM:
-                            TIMBER_ERROR(ex.what());
+                        case EPERM: TIMBER_ERROR(ex.what());
                         default: throw;
                     }
                 }
@@ -129,9 +128,8 @@ namespace netcore {
 
             unix_socket.apply_permissions();
 
-            const auto deferred = ext::scope_exit([&] {
-                unix_socket.remove();
-            });
+            const auto deferred =
+                ext::scope_exit([&] { unix_socket.remove(); });
 
             co_await listen(std::move(socket));
         }
@@ -149,9 +147,7 @@ namespace netcore {
 
         auto operator=(server&& other) -> server& = delete;
 
-        auto address() const noexcept -> const address_type& {
-            return addr;
-        }
+        auto address() const noexcept -> const address_type& { return addr; }
 
         auto close() noexcept -> void {
             if (socket) socket->cancel();
@@ -171,9 +167,8 @@ namespace netcore {
         }
 
         auto listen(const endpoint& endpoint) -> ext::jtask<> {
-            const auto deferred = ext::scope_exit([this] {
-                addr = std::monostate();
-            });
+            const auto deferred =
+                ext::scope_exit([this] { addr = std::monostate(); });
 
             co_await std::visit(
                 [&](auto&& arg) { return listen_priv(arg); },
@@ -188,8 +183,6 @@ namespace netcore {
             if constexpr (server_context_close<T>) context.close();
         }
 
-        auto listening() const noexcept -> bool {
-            return socket != nullptr;
-        }
+        auto listening() const noexcept -> bool { return socket != nullptr; }
     };
 }

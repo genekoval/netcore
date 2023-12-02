@@ -10,9 +10,7 @@ using namespace std::chrono_literals;
 using std::chrono::milliseconds;
 
 namespace {
-    auto now() {
-        return std::chrono::steady_clock::now();
-    }
+    auto now() { return std::chrono::steady_clock::now(); }
 
     auto wait(milliseconds time) -> ext::task<> {
         auto timer = netcore::timer::monotonic();
@@ -28,15 +26,11 @@ namespace {
 }
 
 TEST(Timer, WaitUnderSecond) {
-    netcore::run([]() -> ext::task<> {
-        co_await wait(100ms);
-    }());
+    netcore::run([]() -> ext::task<> { co_await wait(100ms); }());
 }
 
 TEST(Timer, WaitSecond) {
-    netcore::run([]() -> ext::task<> {
-        co_await wait(1s);
-    }());
+    netcore::run([]() -> ext::task<> { co_await wait(1s); }());
 }
 
 TEST(Timer, Disarm) {

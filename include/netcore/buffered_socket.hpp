@@ -13,10 +13,8 @@ namespace netcore {
         buffered_reader<socket> reader;
         buffered_writer<socket> writer;
     public:
-        static auto connect(
-            const endpoint& endpoint,
-            std::size_t buffer_size
-        ) -> ext::task<buffered_socket>;
+        static auto connect(const endpoint& endpoint, std::size_t buffer_size)
+            -> ext::task<buffered_socket>;
 
         buffered_socket();
 
@@ -50,10 +48,8 @@ namespace netcore {
 
         auto read(void* dest, std::size_t len) -> ext::task<>;
 
-        auto sendfile(
-            const netcore::fd& descriptor,
-            std::size_t count
-        ) -> ext::task<>;
+        auto sendfile(const netcore::fd& descriptor, std::size_t count)
+            -> ext::task<>;
 
         auto try_write(const void* src, std::size_t len) -> std::size_t;
 

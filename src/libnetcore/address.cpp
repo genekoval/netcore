@@ -1,7 +1,7 @@
 #include <netcore/address.hpp>
 
-#include <ext/except.h>
 #include <cstring>
+#include <ext/except.h>
 
 namespace {
     constexpr auto error_message = "failed to determine internet address";
@@ -36,26 +36,16 @@ namespace netcore {
         if (info) freeaddrinfo(info);
     }
 
-    auto address::operator*() const noexcept -> addrinfo& {
-        return *info;
-    }
+    auto address::operator*() const noexcept -> addrinfo& { return *info; }
 
-    auto address::operator->() const noexcept -> addrinfo* {
-        return info;
-    }
+    auto address::operator->() const noexcept -> addrinfo* { return info; }
 
-    auto address::get() -> addrinfo* {
-        return info;
-    }
+    auto address::get() -> addrinfo* { return info; }
 
     socket_addr::socket_addr(sockaddr* addr, unsigned int addrlen) {
         switch (addr->sa_family) {
-            case AF_INET:
-                family_ = ip_addr::ipv4;
-                break;
-            case AF_INET6:
-                family_ = ip_addr::ipv6;
-                break;
+            case AF_INET: family_ = ip_addr::ipv4; break;
+            case AF_INET6: family_ = ip_addr::ipv6; break;
             default:
                 throw std::runtime_error(fmt::format(
                     "unexpected socket address family: {}",
@@ -82,22 +72,17 @@ namespace netcore {
             return;
         }
 
-        if (code == EAI_SYSTEM) throw ext::system_error(
-            "address-to-name translation failure"
-        );
+        if (code == EAI_SYSTEM)
+            throw ext::system_error("address-to-name translation failure");
 
         throw std::runtime_error(gai_strerror(code));
     }
 
-    auto socket_addr::family() const noexcept -> ip_addr {
-        return family_;
-    }
+    auto socket_addr::family() const noexcept -> ip_addr { return family_; }
 
     auto socket_addr::host() const noexcept -> std::string_view {
         return host_;
     }
 
-    auto socket_addr::port() const noexcept -> unsigned short {
-        return port_;
-    }
+    auto socket_addr::port() const noexcept -> unsigned short { return port_; }
 }

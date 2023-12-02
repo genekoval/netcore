@@ -40,19 +40,14 @@ namespace netcore {
                 std::exception_ptr exception;
                 awaitable_thread_pool::node node;
             public:
-                awaitable(
-                    F&& f,
-                    awaitable_thread_pool& pool
-                ) :
+                awaitable(F&& f, awaitable_thread_pool& pool) :
                     f(std::forward<F>(f)),
-                    pool(pool)
-                {}
+                    pool(pool) {}
 
                 auto await_ready() const noexcept -> bool { return false; }
 
-                auto await_suspend(
-                    std::coroutine_handle<> coroutine
-                ) noexcept -> void {
+                auto await_suspend(std::coroutine_handle<> coroutine) noexcept
+                    -> void {
                     node.coroutine = coroutine;
 
                     pool.run([this]() -> void {
@@ -76,9 +71,8 @@ namespace netcore {
         }
 
         template <typename F, typename R = std::invoke_result_t<F>>
-        requires
-            std::movable<R> &&
-            std::convertible_to<std::invoke_result_t<F>, R>
+        requires std::movable<R> &&
+                 std::convertible_to<std::invoke_result_t<F>, R>
         auto await(F&& f) -> ext::jtask<R> {
             auto result = std::optional<R>();
 

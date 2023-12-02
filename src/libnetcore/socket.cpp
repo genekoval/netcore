@@ -14,18 +14,13 @@
 namespace netcore {
     socket::socket(int fd) :
         descriptor(fd),
-        event(runtime::event::create(fd, EPOLLIN | EPOLLOUT))
-    {
+        event(runtime::event::create(fd, EPOLLIN | EPOLLOUT)) {
         TIMBER_TRACE("{} created", *this);
     }
 
     socket::socket(int domain, int type, int protocol) :
-        socket(::socket(
-            domain,
-            type | SOCK_NONBLOCK | SOCK_CLOEXEC,
-            protocol
-        ))
-    {
+        socket(::socket(domain, type | SOCK_NONBLOCK | SOCK_CLOEXEC, protocol)
+        ) {
         if (!descriptor.valid()) {
             throw ext::system_error("Failed to create socket");
         }
@@ -39,14 +34,10 @@ namespace netcore {
         if (!co_await event->out()) throw task_canceled();
     }
 
-    auto socket::cancel() noexcept -> void {
-        event->cancel();
-    }
+    auto socket::cancel() noexcept -> void { event->cancel(); }
 
-    auto socket::connect(
-        const sockaddr* addr,
-        socklen_t len
-    ) -> ext::task<bool> {
+    auto socket::connect(const sockaddr* addr, socklen_t len)
+        -> ext::task<bool> {
         while (true) {
             if (::connect(descriptor, addr, len) == 0) co_return true;
             if (errno == EINPROGRESS) {
@@ -64,9 +55,7 @@ namespace netcore {
         TIMBER_DEBUG("{} shutdown transmissions", *this);
     }
 
-    auto socket::failed() const noexcept -> bool {
-        return error;
-    }
+    auto socket::failed() const noexcept -> bool { return error; }
 
     auto socket::failure(const char* message) -> void {
         error = true;
@@ -74,14 +63,9 @@ namespace netcore {
         throw ext::system_error(message);
     }
 
-    auto socket::fd() const noexcept -> int {
-        return descriptor;
-    }
+    auto socket::fd() const noexcept -> int { return descriptor; }
 
-    auto socket::read(
-        void* dest,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto socket::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
         auto bytes_read = -1;
 
         do {
@@ -92,26 +76,19 @@ namespace netcore {
         co_return bytes_read;
     }
 
-    auto socket::release() ->
-        std::pair<netcore::fd, std::shared_ptr<runtime::event>>
-    {
+    auto socket::release()
+        -> std::pair<netcore::fd, std::shared_ptr<runtime::event>> {
         return {std::move(descriptor), std::move(event)};
     }
 
-    auto socket::sendfile(
-        const netcore::fd& descriptor,
-        std::size_t count
-    ) -> ext::task<> {
+    auto socket::sendfile(const netcore::fd& descriptor, std::size_t count)
+        -> ext::task<> {
         auto sent = std::size_t();
         auto offset = off_t();
 
         while (sent < count) {
-            const auto bytes = ::sendfile(
-                this->descriptor,
-                descriptor,
-                &offset,
-                count - sent
-            );
+            const auto bytes =
+                ::sendfile(this->descriptor, descriptor, &offset, count - sent);
 
             if (bytes == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -125,7 +102,11 @@ namespace netcore {
             sent += bytes;
 
             TIMBER_DEBUG(
-                "{} send {} bytes (sendfile [{}/{}])", *this, bytes, sent, count
+                "{} send {} bytes (sendfile [{}/{}])",
+                *this,
+                bytes,
+                sent,
+                count
             );
         }
     }
@@ -168,10 +149,8 @@ namespace netcore {
 
     auto socket::valid() const -> bool { return descriptor.valid(); }
 
-    auto socket::write(
-        const void* src,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto socket::write(const void* src, std::size_t len)
+        -> ext::task<std::size_t> {
         auto bytes_written = -1;
 
         do {

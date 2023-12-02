@@ -1,6 +1,6 @@
-#include <netcore/proc/stdio.hpp>
 #include <netcore/except.hpp>
 #include <netcore/file.hpp>
+#include <netcore/proc/stdio.hpp>
 
 #include <ext/except.h>
 #include <fcntl.h>
@@ -18,12 +18,9 @@ using netcore::proc::stdio_type;
 namespace {
     auto make_stdio(int descriptor, stdio stdio) -> stdio_type {
         switch (stdio) {
-            case stdio::inherit:
-                return inherit(descriptor);
-            case stdio::null:
-                return null(descriptor);
-            case stdio::piped:
-                return piped(descriptor);
+            case stdio::inherit: return inherit(descriptor);
+            case stdio::null: return null(descriptor);
+            case stdio::piped: return piped(descriptor);
         }
 
         __builtin_unreachable();
@@ -86,9 +83,7 @@ namespace netcore::proc {
         }
     }
 
-    auto piped::close() -> void {
-        fd.close();
-    }
+    auto piped::close() -> void { fd.close(); }
 
     auto piped::parent() -> void {
         fd = descriptor == STDIN_FILENO ? pipe.write() : pipe.read();
@@ -125,10 +120,8 @@ namespace netcore::proc {
         co_return bytes;
     }
 
-    auto piped::write(
-        const void* src,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto piped::write(const void* src, std::size_t len)
+        -> ext::task<std::size_t> {
         auto bytes = -1;
 
         do {
@@ -156,17 +149,18 @@ namespace netcore::proc {
     }
 
     stdio_stream::stdio_stream(int descriptor, stdio stdio) :
-        type(make_stdio(descriptor, stdio))
-    {}
+        type(make_stdio(descriptor, stdio)) {}
 
     auto stdio_stream::child() -> void {
-        std::visit([](auto&& stream) {
-            using T = std::decay_t<decltype(stream)>;
+        std::visit(
+            [](auto&& stream) {
+                using T = std::decay_t<decltype(stream)>;
 
-            if constexpr (
-                std::is_same_v<T, null> || std::is_same_v<T, piped>
-            ) stream.child();
-        }, type);
+                if constexpr (std::is_same_v<T, null> || std::is_same_v<T, piped>)
+                    stream.child();
+            },
+            type
+        );
     }
 
     auto stdio_stream::close() -> void {
@@ -177,20 +171,16 @@ namespace netcore::proc {
         if (auto* const stream = std::get_if<piped>(&type)) stream->parent();
     }
 
-    auto stdio_stream::read(
-        void* dest,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto stdio_stream::read(void* dest, std::size_t len)
+        -> ext::task<std::size_t> {
         if (auto* const stream = std::get_if<piped>(&type)) {
             return stream->read(dest, len);
         }
         else throw std::logic_error("stream unavailable for reading");
     }
 
-    auto stdio_stream::write(
-        const void* src,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto stdio_stream::write(const void* src, std::size_t len)
+        -> ext::task<std::size_t> {
         if (auto* const stream = std::get_if<piped>(&type)) {
             return stream->write(src, len);
         }

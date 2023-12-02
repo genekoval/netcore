@@ -25,19 +25,16 @@ namespace netcore {
     }
 
     auto parse_endpoint(std::string_view string) -> endpoint {
-        if (string.starts_with("/")) {
-            return unix_socket { .path = string };
-        }
+        if (string.starts_with("/")) { return unix_socket {.path = string}; }
 
         const auto separator = string.find(":");
 
         if (separator == std::string_view::npos) {
-            return inet_socket { .port = std::string(string) };
+            return inet_socket {.port = std::string(string)};
         }
 
         return inet_socket {
             .host = std::string(string.substr(0, separator)),
-            .port = std::string(string.substr(separator + 1))
-        };
+            .port = std::string(string.substr(separator + 1))};
     }
 }

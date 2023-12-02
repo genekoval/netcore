@@ -1,15 +1,14 @@
 #include <netcore/eventfd.hpp>
 
 #include <ext/except.h>
-#include <sys/eventfd.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <timber/timber>
 
 namespace netcore {
     eventfd::eventfd() :
         descriptor(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)),
-        event(runtime::event::create(descriptor, EPOLLIN))
-    {
+        event(runtime::event::create(descriptor, EPOLLIN)) {
         if (!descriptor.valid()) {
             throw ext::system_error("Failed to create eventfd");
         }
@@ -44,9 +43,7 @@ namespace netcore {
 
     eventfd_handle::eventfd_handle(int descriptor) : descriptor(descriptor) {}
 
-    eventfd_handle::operator bool() const noexcept {
-        return valid();
-    }
+    eventfd_handle::operator bool() const noexcept { return valid(); }
 
     auto eventfd_handle::set(std::uint64_t value) const -> void {
         if (eventfd_write(descriptor, value) == -1) {

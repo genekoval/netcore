@@ -12,9 +12,7 @@ namespace {
 }
 
 namespace netcore {
-    auto runtime::active() -> bool {
-        return current_runtime != nullptr;
-    }
+    auto runtime::active() -> bool { return current_runtime != nullptr; }
 
     auto runtime::current() -> runtime& {
         assert(
@@ -28,15 +26,13 @@ namespace netcore {
     runtime::runtime(int max_events) :
         events(std::make_unique<epoll_event[]>(max_events)),
         max_events(max_events),
-        descriptor(epoll_create1(EPOLL_CLOEXEC))
-    {
+        descriptor(epoll_create1(EPOLL_CLOEXEC)) {
         if (!descriptor.valid()) {
             throw ext::system_error("epoll create failure");
         }
 
         if (current_runtime) {
-            throw std::runtime_error(
-                "runtime cannot be created: already exists"
+            throw std::runtime_error("runtime cannot be created: already exists"
             );
         }
 
@@ -53,17 +49,9 @@ namespace netcore {
     auto runtime::add(runtime::event* event) -> void {
         auto ev = epoll_event {
             .events = event->events | permanent_events,
-            .data = {
-                .ptr = event
-            }
-        };
+            .data = {.ptr = event}};
 
-        if (epoll_ctl(
-            descriptor,
-            EPOLL_CTL_ADD,
-            event->fd(),
-            &ev
-        ) == -1) {
+        if (epoll_ctl(descriptor, EPOLL_CTL_ADD, event->fd(), &ev) == -1) {
             TIMBER_DEBUG("{} failed to add entry ({})", *this, event->fd());
             throw ext::system_error("Failed to add entry to interest list");
         }
@@ -74,17 +62,9 @@ namespace netcore {
     auto runtime::modify(runtime::event* event) -> void {
         auto ev = epoll_event {
             .events = event->events | permanent_events,
-            .data = {
-                .ptr = event
-            }
-        };
+            .data = {.ptr = event}};
 
-        if (epoll_ctl(
-            descriptor,
-            EPOLL_CTL_MOD,
-            event->fd(),
-            &ev
-        ) == -1) {
+        if (epoll_ctl(descriptor, EPOLL_CTL_MOD, event->fd(), &ev) == -1) {
             TIMBER_DEBUG("{} failed to modify entry ({})", *this, event->fd());
             throw ext::system_error("Failed to modify runtime entry");
         }
@@ -92,9 +72,7 @@ namespace netcore {
         TIMBER_TRACE("{} modified entry ({})", *this, event->fd());
     }
 
-    auto runtime::enqueue(detail::awaiter& a) -> void {
-        pending.enqueue(a);
-    }
+    auto runtime::enqueue(detail::awaiter& a) -> void { pending.enqueue(a); }
 
     auto runtime::enqueue(detail::awaiter_queue& awaiters) -> void {
         pending.enqueue(awaiters);
@@ -144,9 +122,8 @@ namespace netcore {
                 pending.empty() ? -1 : 0
             );
 
-            const auto wait_time = duration_cast<milliseconds>(
-                clock::now() - wait_started
-            );
+            const auto wait_time =
+                duration_cast<milliseconds>(clock::now() - wait_started);
 
             TIMBER_TRACE(
                 "{} waited for {:L}ms ({:L} ready / {:L} total)",
@@ -182,8 +159,7 @@ namespace netcore {
 
     runtime::event::event(int fd, std::uint32_t events) noexcept :
         descriptor(fd),
-        events(events)
-    {
+        events(events) {
         runtime::current().add(this);
         this->events = 0;
     }
@@ -196,16 +172,12 @@ namespace netcore {
         if (awaiting_out) awaiting_out.resume();
     }
 
-    auto runtime::event::create(
-        int fd,
-        std::uint32_t events
-    ) noexcept -> std::shared_ptr<event> {
+    auto runtime::event::create(int fd, std::uint32_t events) noexcept
+        -> std::shared_ptr<event> {
         return std::shared_ptr<event>(new event(fd, events));
     }
 
-    auto runtime::event::fd() const noexcept -> int {
-        return descriptor;
-    }
+    auto runtime::event::fd() const noexcept -> int { return descriptor; }
 
     auto runtime::event::in() noexcept -> awaitable {
         return awaitable(*this, awaiting_in);
@@ -231,10 +203,10 @@ namespace netcore {
         );
 
         if (this->events) {
-            if (awaiting_out && (
-                ((this->events & EPOLLIN) && (events & EPOLLIN)) ||
-                ((this->events & EPOLLOUT) && (events & EPOLLOUT))
-            )) awaiting_out.resume();
+            if (awaiting_out &&
+                (((this->events & EPOLLIN) && (events & EPOLLIN)) ||
+                 ((this->events & EPOLLOUT) && (events & EPOLLOUT))))
+                awaiting_out.resume();
 
             return;
         }
@@ -248,8 +220,7 @@ namespace netcore {
         std::coroutine_handle<>& coroutine
     ) noexcept :
         event(event),
-        coroutine(coroutine)
-    {}
+        coroutine(coroutine) {}
 
     runtime::event::awaitable::~awaitable() {
         if (!coroutine) return;
@@ -285,7 +256,6 @@ namespace netcore {
                 --runtime::current().awaiters;
             }
         }
-
 
         const auto canceled = event.canceled;
         if (!(event.awaiting_in || event.awaiting_out)) event.canceled = false;

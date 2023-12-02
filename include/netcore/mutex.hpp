@@ -44,13 +44,9 @@ namespace netcore {
                 return *this;
             }
 
-            auto operator*() const noexcept -> T& {
-                return mut->data;
-            }
+            auto operator*() const noexcept -> T& { return mut->data; }
 
-            auto operator->() const noexcept -> T* {
-                return &mut->data;
-            }
+            auto operator->() const noexcept -> T* { return &mut->data; }
         };
 
         friend class guard;
@@ -66,9 +62,7 @@ namespace netcore {
 
         auto operator=(mutex&&) -> mutex& = delete;
 
-        auto get() noexcept -> T& {
-            return data;
-        }
+        auto get() noexcept -> T& { return data; }
 
         auto lock() -> ext::task<guard> {
             if (locked) co_await detail::awaitable(awaiters, nullptr);

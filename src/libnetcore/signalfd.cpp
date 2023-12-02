@@ -11,8 +11,7 @@
 namespace netcore {
     signalfd::signalfd(int descriptor) :
         descriptor(descriptor),
-        event(runtime::event::create(this->descriptor, EPOLLIN))
-    {
+        event(runtime::event::create(this->descriptor, EPOLLIN)) {
         TIMBER_TRACE("signalfd ({}) created", descriptor);
     }
 
@@ -22,16 +21,14 @@ namespace netcore {
         auto mask = sigset_t();
         sigemptyset(&mask);
 
-        for (const auto& sig: signals) sigaddset(&mask, sig);
+        for (const auto& sig : signals) sigaddset(&mask, sig);
 
         if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
             throw ext::system_error("sigprocmask failure");
         }
 
         auto fd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
-        if (fd == -1) {
-            throw ext::system_error("Failed to create signalfd");
-        }
+        if (fd == -1) { throw ext::system_error("Failed to create signalfd"); }
 
         return signalfd(fd);
     }

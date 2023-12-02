@@ -46,9 +46,8 @@ namespace netcore {
     };
 
     template <typename Rep, typename Period>
-    auto sleep_for(
-        const std::chrono::duration<Rep, Period>& duration
-    ) -> ext::task<> {
+    auto sleep_for(const std::chrono::duration<Rep, Period>& duration)
+        -> ext::task<> {
         auto timer = netcore::timer::monotonic();
         timer.set(duration);
 
@@ -56,9 +55,8 @@ namespace netcore {
     }
 
     template <typename Clock, typename Duration>
-    auto sleep_until(
-        const std::chrono::time_point<Clock, Duration>& sleep_time
-    ) -> ext::task<> {
+    auto sleep_until(const std::chrono::time_point<Clock, Duration>& sleep_time)
+        -> ext::task<> {
         const auto duration = sleep_time - Clock::now();
 
         auto timer = netcore::timer::realtime();

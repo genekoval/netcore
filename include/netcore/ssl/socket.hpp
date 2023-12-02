@@ -37,10 +37,8 @@ namespace netcore::ssl {
 
         auto try_write(const void* src, std::size_t len) -> long;
 
-        auto write(
-            const void* src,
-            std::size_t length
-        ) -> ext::task<std::size_t>;
+        auto write(const void* src, std::size_t length)
+            -> ext::task<std::size_t>;
     };
 }
 
@@ -53,10 +51,6 @@ struct fmt::formatter<netcore::ssl::socket> {
 
     template <typename FormatContext>
     auto format(const netcore::ssl::socket& socket, FormatContext& ctx) {
-        return fmt::format_to(
-            ctx.out(),
-            "SSL socket ({})",
-            socket.fd()
-        );
+        return fmt::format_to(ctx.out(), "SSL socket ({})", socket.fd());
     }
 };

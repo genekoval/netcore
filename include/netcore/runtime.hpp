@@ -45,10 +45,8 @@ namespace netcore {
                 auto await_resume() noexcept -> std::uint32_t;
             };
 
-            static auto create(
-                int fd,
-                std::uint32_t events
-            ) noexcept -> std::shared_ptr<event>;
+            static auto create(int fd, std::uint32_t events) noexcept
+                -> std::shared_ptr<event>;
 
             std::uint32_t events;
             std::coroutine_handle<> awaiting_in;
@@ -130,9 +128,7 @@ namespace netcore {
 
 template <>
 struct fmt::formatter<netcore::runtime> {
-    constexpr auto parse(auto& ctx) {
-        return ctx.begin();
-    }
+    constexpr auto parse(auto& ctx) { return ctx.begin(); }
 
     auto format(const netcore::runtime& runtime, auto& ctx) {
         return fmt::format_to(ctx.out(), "runtime ({})", runtime.descriptor);

@@ -7,9 +7,7 @@ class Mutex : public testing::Test {
 protected:
     netcore::mutex<int> mutex = 0;
 
-    auto increment() -> ext::detached_task {
-        ++*co_await mutex.lock();
-    }
+    auto increment() -> ext::detached_task { ++*co_await mutex.lock(); }
 };
 
 TEST_F(Mutex, Get) {

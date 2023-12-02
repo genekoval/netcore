@@ -2,9 +2,7 @@
 #include <netcore/runtime.hpp>
 
 namespace netcore {
-    auto event<void>::emit() -> void {
-        detail::event::emit();
-    }
+    auto event<void>::emit() -> void { detail::event::emit(); }
 
     auto event<void>::listen() -> ext::task<> {
         co_await detail::awaitable(listeners, nullptr);
@@ -17,7 +15,5 @@ namespace netcore::detail {
         emit();
     }
 
-    auto event::emit() -> void {
-        runtime::current().enqueue(listeners);
-    }
+    auto event::emit() -> void { runtime::current().enqueue(listeners); }
 }

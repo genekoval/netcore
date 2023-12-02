@@ -41,8 +41,7 @@ namespace netcore::proc {
         std::array<proc::stdio, 3> stdio {
             proc::stdio::null,
             proc::stdio::inherit,
-            proc::stdio::inherit
-        };
+            proc::stdio::inherit};
 
         [[noreturn]]
         auto exec() noexcept -> void;
@@ -65,9 +64,7 @@ namespace netcore::proc {
 
         auto spawn() -> child;
 
-        auto working_directory(
-            const std::filesystem::path& path
-        ) -> command&;
+        auto working_directory(const std::filesystem::path& path) -> command&;
     };
 
     template <typename T = void, typename... Args>
@@ -93,10 +90,7 @@ struct fmt::formatter<netcore::proc::arguments> : formatter<std::string_view> {
     template <typename FormatContext>
     auto format(const netcore::proc::arguments& arguments, FormatContext& ctx) {
         if (arguments.storage.empty()) {
-            return formatter<std::string_view>::format(
-                "<no arguments>",
-                ctx
-            );
+            return formatter<std::string_view>::format("<no arguments>", ctx);
         }
 
         auto buffer = memory_buffer();

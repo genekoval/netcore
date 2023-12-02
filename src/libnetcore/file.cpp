@@ -9,17 +9,12 @@ namespace netcore {
         const auto result = ::open(path.c_str(), flags);
 
         if (result == -1) {
-            throw ext::system_error(fmt::format(
-                R"(could not open file: "{}")",
-                path.native()
-            ));
+            throw ext::system_error(
+                fmt::format(R"(could not open file: "{}")", path.native())
+            );
         }
 
-        TIMBER_DEBUG(
-            R"(opened file ({}): "{}")",
-            result,
-            path.native()
-        );
+        TIMBER_DEBUG(R"(opened file ({}): "{}")", result, path.native());
 
         return result;
     }

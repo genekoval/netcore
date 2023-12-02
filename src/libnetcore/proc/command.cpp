@@ -6,7 +6,8 @@ namespace fs = std::filesystem;
 
 namespace netcore::proc {
     arguments::~arguments() {
-        for (auto* string : storage) if (string) delete[] string;
+        for (auto* string : storage)
+            if (string) delete[] string;
     }
 
     auto arguments::operator[](std::size_t index) -> char* {
@@ -19,21 +20,15 @@ namespace netcore::proc {
         string[arg.size()] = '\0';
     }
 
-    auto arguments::append_null() -> void {
-        storage.push_back(nullptr);
-    }
+    auto arguments::append_null() -> void { storage.push_back(nullptr); }
 
-    auto arguments::get() noexcept -> char** {
-        return storage.data();
-    }
+    auto arguments::get() noexcept -> char** { return storage.data(); }
 
     auto arguments::size() const noexcept -> std::size_t {
         return storage.size();
     }
 
-    command::command(std::string_view program) {
-        arg(program);
-    }
+    command::command(std::string_view program) { arg(program); }
 
     auto command::err(proc::stdio stdio) -> command& {
         this->stdio[2] = stdio;
@@ -82,8 +77,7 @@ namespace netcore::proc {
         auto streams = stdio_streams {
             stdio_stream(0, stdio[0]),
             stdio_stream(1, stdio[1]),
-            stdio_stream(2, stdio[2])
-        };
+            stdio_stream(2, stdio[2])};
 
         auto child = fork();
 

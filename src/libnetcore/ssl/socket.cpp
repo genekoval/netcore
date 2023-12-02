@@ -21,8 +21,7 @@ namespace netcore::ssl {
     ) :
         descriptor(std::forward<netcore::fd>(descriptor)),
         event(std::forward<std::shared_ptr<runtime::event>>(event)),
-        ssl(std::forward<netcore::ssl::ssl>(ssl))
-    {
+        ssl(std::forward<netcore::ssl::ssl>(ssl)) {
         this->ssl.set_fd(this->descriptor);
     }
 
@@ -32,12 +31,8 @@ namespace netcore::ssl {
             if (ret == 1) break;
 
             switch (ssl.get_error(ret)) {
-                case SSL_ERROR_WANT_READ:
-                    co_await await_read();
-                    break;
-                case SSL_ERROR_WANT_WRITE:
-                    co_await await_write();
-                    break;
+                case SSL_ERROR_WANT_READ: co_await await_read(); break;
+                case SSL_ERROR_WANT_WRITE: co_await await_write(); break;
                 default:
                     throw error(
                         "Failed to complete TLS/SSL handshake with client"
@@ -56,10 +51,8 @@ namespace netcore::ssl {
             co_return std::string_view();
         }
 
-        auto protocol = std::string_view(
-            reinterpret_cast<const char*>(alpn),
-            len
-        );
+        auto protocol =
+            std::string_view(reinterpret_cast<const char*>(alpn), len);
 
         TIMBER_TRACE("{} client selected protocol: {}", *this, protocol);
 
@@ -74,9 +67,7 @@ namespace netcore::ssl {
         if (!co_await event->out()) throw task_canceled();
     }
 
-    auto socket::fd() const noexcept -> int {
-        return descriptor;
-    }
+    auto socket::fd() const noexcept -> int { return descriptor; }
 
     auto socket::read(void* dest, std::size_t len) -> ext::task<std::size_t> {
         while (true) {
@@ -91,14 +82,9 @@ namespace netcore::ssl {
         const auto ret = ssl.shutdown();
 
         switch (ret) {
-            case 0:
-                TIMBER_DEBUG("{} sent close_notify", *this);
-                break;
-            case 1:
-                TIMBER_DEBUG("{} shutdown complete", *this);
-                break;
-            default:
-                return ssl.get_error(ret);
+            case 0: TIMBER_DEBUG("{} sent close_notify", *this); break;
+            case 1: TIMBER_DEBUG("{} shutdown complete", *this); break;
+            default: return ssl.get_error(ret);
         }
 
         return std::nullopt;
@@ -130,16 +116,13 @@ namespace netcore::ssl {
                 if (errno) throw ext::system_error(read_error);
                 throw std::runtime_error(read_error);
             case SSL_ERROR_SSL:
-                if (
-                    ERR_GET_REASON(ERR_peek_error()) ==
-                    SSL_R_UNEXPECTED_EOF_WHILE_READING
-                ) {
+                if (ERR_GET_REASON(ERR_peek_error()) ==
+                    SSL_R_UNEXPECTED_EOF_WHILE_READING) {
                     ERR_get_error(); // Remove the error from the queue.
                     throw eof();
                 }
                 [[fallthrough]];
-            default:
-                throw error(read_error);
+            default: throw error(read_error);
         }
     }
 
@@ -159,15 +142,12 @@ namespace netcore::ssl {
             case SSL_ERROR_WANT_WRITE:
                 TIMBER_TRACE("{} wants to write", *this);
                 return -1;
-            default:
-                throw error("SSL socket failed to write data");
+            default: throw error("SSL socket failed to write data");
         }
     }
 
-    auto socket::write(
-        const void* src,
-        std::size_t len
-    ) -> ext::task<std::size_t> {
+    auto socket::write(const void* src, std::size_t len)
+        -> ext::task<std::size_t> {
         while (true) {
             const auto written = try_write(src, len);
             if (written >= 0) co_return written;

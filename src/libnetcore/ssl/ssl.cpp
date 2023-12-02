@@ -15,9 +15,7 @@ namespace netcore::ssl {
 
     ssl::ssl(ssl&& other) : handle(std::exchange(other.handle, nullptr)) {}
 
-    ssl::~ssl() {
-        SSL_free(handle);
-    }
+    ssl::~ssl() { SSL_free(handle); }
 
     auto ssl::operator=(const ssl& other) -> ssl& {
         if (handle != other.handle) {
@@ -42,17 +40,13 @@ namespace netcore::ssl {
         return *this;
     }
 
-    auto ssl::accept() -> int {
-        return SSL_accept(handle);
-    }
+    auto ssl::accept() -> int { return SSL_accept(handle); }
 
     auto ssl::get_error(int ret) const noexcept -> int {
         return SSL_get_error(handle, ret);
     }
 
-    auto ssl::get() const noexcept -> SSL* {
-        return handle;
-    }
+    auto ssl::get() const noexcept -> SSL* { return handle; }
 
     auto ssl::set_fd(int fd) -> void {
         if (SSL_set_fd(handle, fd) != 1) {
@@ -60,7 +54,5 @@ namespace netcore::ssl {
         }
     }
 
-    auto ssl::shutdown() const noexcept -> int {
-        return SSL_shutdown(handle);
-    }
+    auto ssl::shutdown() const noexcept -> int { return SSL_shutdown(handle); }
 }

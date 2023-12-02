@@ -9,10 +9,9 @@ namespace netcore {
         auto flags = fcntl(fd, F_GETFL, 0);
 
         if (flags == -1) {
-            throw ext::system_error(fmt::format(
-                "Failed to get flags for file descriptor ({})",
-                fd
-            ));
+            throw ext::system_error(
+                fmt::format("Failed to get flags for file descriptor ({})", fd)
+            );
         }
 
         return flags;
@@ -22,14 +21,11 @@ namespace netcore {
         const auto new_flags = netcore::flags(fd) | flags;
 
         if (fcntl(fd, F_SETFL, new_flags) == -1) {
-            throw ext::system_error(fmt::format(
-                "Failed to set flags for file descriptor ({})",
-                fd
-            ));
+            throw ext::system_error(
+                fmt::format("Failed to set flags for file descriptor ({})", fd)
+            );
         }
     }
 
-    auto make_nonblocking(int fd) -> void {
-        flags(fd, O_NONBLOCK);
-    }
+    auto make_nonblocking(int fd) -> void { flags(fd, O_NONBLOCK); }
 }

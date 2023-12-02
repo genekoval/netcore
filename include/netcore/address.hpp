@@ -1,9 +1,9 @@
 #pragma once
 
 #include <array>
-#include <netdb.h>
 #include <filesystem>
 #include <fmt/core.h>
+#include <netdb.h>
 #include <string_view>
 #include <variant>
 
@@ -24,10 +24,7 @@ namespace netcore {
         auto get() -> addrinfo*;
     };
 
-    enum class ip_addr {
-        ipv4,
-        ipv6
-    };
+    enum class ip_addr { ipv4, ipv6 };
 
     class socket_addr {
         std::string host_;
@@ -56,17 +53,20 @@ struct fmt::formatter<netcore::address_type> {
 
     template <typename FormatContext>
     auto format(const netcore::address_type& addr, FormatContext& ctx) {
-        return std::visit([&ctx](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
+        return std::visit(
+            [&ctx](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
 
-            if constexpr (std::is_same_v<T, std::monostate>) {
-                return fmt::format_to(ctx.out(), "<no address>");
-            }
-            else if constexpr (std::is_same_v<T, std::filesystem::path>) {
-                return fmt::format_to(ctx.out(), R"("{}")", arg.native());
-            }
-            else return fmt::format_to(ctx.out(), "{}", arg);
-        }, addr);
+                if constexpr (std::is_same_v<T, std::monostate>) {
+                    return fmt::format_to(ctx.out(), "<no address>");
+                }
+                else if constexpr (std::is_same_v<T, std::filesystem::path>) {
+                    return fmt::format_to(ctx.out(), R"("{}")", arg.native());
+                }
+                else return fmt::format_to(ctx.out(), "{}", arg);
+            },
+            addr
+        );
     }
 };
 

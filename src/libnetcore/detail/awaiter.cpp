@@ -20,12 +20,10 @@ namespace netcore::detail {
 
     awaiter_queue::awaiter_queue(awaiter_queue&& other) :
         head(std::exchange(other.head, nullptr)),
-        tail(std::exchange(other.tail, nullptr))
-    {}
+        tail(std::exchange(other.tail, nullptr)) {}
 
-    auto awaiter_queue::operator=(
-        awaiter_queue&& other
-    ) noexcept -> awaiter_queue& {
+    auto awaiter_queue::operator=(awaiter_queue&& other) noexcept
+        -> awaiter_queue& {
         head = std::exchange(other.head, nullptr);
         tail = std::exchange(other.tail, nullptr);
 
@@ -104,14 +102,11 @@ namespace netcore::detail {
     }
 
     awaitable::awaitable(awaiter_queue& awaiters, void* state) :
-        awaiters(awaiters)
-    {
+        awaiters(awaiters) {
         a.state = state;
     }
 
-    auto awaitable::await_ready() const noexcept -> bool {
-        return false;
-    }
+    auto awaitable::await_ready() const noexcept -> bool { return false; }
 
     auto awaitable::await_suspend(std::coroutine_handle<> coroutine) -> void {
         a.coroutine = coroutine;

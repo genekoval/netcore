@@ -13,8 +13,7 @@ namespace netcore {
             std::bind_front(&async_thread::entry, this),
             max_events,
             std::string(name)
-        )
-    {}
+        ) {}
 
     auto async_thread::alert() -> void {
         const auto lock = unique_lock(mutex);
@@ -68,10 +67,8 @@ namespace netcore {
         alert();
     }
 
-    auto async_thread::run_task(
-        ext::task<> task,
-        const std::stop_token& stoken
-    ) -> ext::detached_task {
+    auto async_thread::run_task(ext::task<> task, const std::stop_token& stoken)
+        -> ext::detached_task {
         ++task_count;
 
         try {
@@ -99,9 +96,8 @@ namespace netcore {
         }
     }
 
-    auto async_thread::wait_for_tasks(
-        const std::stop_token& stoken
-    ) -> ext::detached_task {
+    auto async_thread::wait_for_tasks(const std::stop_token& stoken)
+        -> ext::detached_task {
         auto event = eventfd();
 
         {

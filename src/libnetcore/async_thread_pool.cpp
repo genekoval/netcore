@@ -11,10 +11,9 @@ namespace netcore {
         threads.reserve(count);
 
         for (auto i = 1; i <= count; ++i) {
-            threads.emplace_back(new async_thread(
-                max_events,
-                fmt::format("{}[{}]", name, i)
-            ));
+            threads.emplace_back(
+                new async_thread(max_events, fmt::format("{}[{}]", name, i))
+            );
         }
     }
 

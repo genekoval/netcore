@@ -43,8 +43,7 @@ namespace netcore::proc {
     process::process(pid_t pid) :
         id(pid),
         descriptor(syscall(SYS_pidfd_open, id, PIDFD_NONBLOCK)),
-        event(runtime::event::create(descriptor, EPOLLIN))
-    {
+        event(runtime::event::create(descriptor, EPOLLIN)) {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to open pid fd");
         }
@@ -52,9 +51,7 @@ namespace netcore::proc {
         TIMBER_TRACE("{} created", *this);
     }
 
-    process::operator bool() const noexcept {
-        return id != 0;
-    }
+    process::operator bool() const noexcept { return id != 0; }
 
     auto process::kill(int signal) const -> void {
         const auto* str = strsignal(signal);
@@ -77,9 +74,7 @@ namespace netcore::proc {
         }
     }
 
-    auto process::pid() const noexcept -> pid_t {
-        return id;
-    }
+    auto process::pid() const noexcept -> pid_t { return id; }
 
     auto process::wait(int states) -> ext::task<state> {
         auto siginfo = siginfo_t();
@@ -89,17 +84,17 @@ namespace netcore::proc {
                 if (errno == EAGAIN) {
                     if (!co_await event->in()) throw task_canceled();
                 }
-                else throw ext::system_error(fmt::format(
-                    "failed to wait for process with PID {}",
-                    id
-                ));
+                else
+                    throw ext::system_error(fmt::format(
+                        "failed to wait for process with PID {}",
+                        id
+                    ));
             }
         } while (siginfo.si_pid == 0);
 
         auto result = state {
             .code = to_code(siginfo.si_code),
-            .status = siginfo.si_status
-        };
+            .status = siginfo.si_status};
 
         TIMBER_DEBUG("{} {}", *this, result);
 

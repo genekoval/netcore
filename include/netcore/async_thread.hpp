@@ -18,26 +18,20 @@ namespace netcore {
 
         auto alert() -> void;
 
-        auto entry(
-            std::stop_token stoken,
-            int max_events,
-            std::string name
-        ) -> void;
+        auto entry(std::stop_token stoken, int max_events, std::string name)
+            -> void;
 
         auto pop_task() -> std::optional<ext::task<>>;
 
         auto push_task(ext::task<>&& task) -> void;
 
-        auto run_task(
-            ext::task<> task,
-            const std::stop_token& stoken
-        ) -> ext::detached_task;
+        auto run_task(ext::task<> task, const std::stop_token& stoken)
+            -> ext::detached_task;
 
         auto run_tasks(const std::stop_token& stoken) -> void;
 
-        auto wait_for_tasks(
-            const std::stop_token& stoken
-        ) -> ext::detached_task;
+        auto wait_for_tasks(const std::stop_token& stoken)
+            -> ext::detached_task;
     public:
         async_thread() = default;
 
@@ -51,10 +45,8 @@ namespace netcore {
         auto wait(ext::task<T>&& task) -> ext::task<T> {
             auto complete = eventfd();
 
-            run([](
-                const ext::task<T>& task,
-                eventfd_handle complete
-            ) -> ext::task<> {
+            run([](const ext::task<T>& task,
+                   eventfd_handle complete) -> ext::task<> {
                 co_await task.when_ready();
                 complete.set();
             }(task, complete.handle()));

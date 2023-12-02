@@ -15,13 +15,8 @@ namespace netcore {
             ext::jtask<> task;
 
             template <typename Factory, typename Endpoint>
-            entry(
-                Factory& factory,
-                const Endpoint& config,
-                endpoint_ref& out
-            ) :
-                server(factory(config, out))
-            {}
+            entry(Factory& factory, const Endpoint& config, endpoint_ref& out) :
+                server(factory(config, out)) {}
         };
 
         using entry_list = ext::dynarray<entry>;
@@ -30,26 +25,21 @@ namespace netcore {
 
         server_list(typename entry_list::size_type count) : entries(count) {}
     public:
-        template <
-            typename Factory,
-            typename Endpoint,
-            typename ErrorHandler
-        >
-        requires
-            requires(
-                Factory factory,
-                Endpoint& endpoint,
-                endpoint_ref& out
-            ) {
-                { factory(endpoint, out) } -> std::same_as<server<Context>>;
-            } &&
-            requires(
-                ErrorHandler& on_error,
-                Endpoint& endpoint,
-                std::exception_ptr ex
-            ) {
-                { on_error(endpoint, ex) };
-            }
+        template <typename Factory, typename Endpoint, typename ErrorHandler>
+        requires requires(
+                     Factory factory,
+                     Endpoint& endpoint,
+                     endpoint_ref& out
+                 ) {
+            { factory(endpoint, out) } -> std::same_as<server<Context>>;
+        } &&
+                 requires(
+                     ErrorHandler& on_error,
+                     Endpoint& endpoint,
+                     std::exception_ptr ex
+                 ) {
+                     { on_error(endpoint, ex) };
+                 }
         static auto listen(
             std::span<Endpoint> configs,
             Factory&& factory,
@@ -60,11 +50,8 @@ namespace netcore {
 
             for (auto& config : configs) {
                 auto endpoint = endpoint_ref();
-                auto& [server, task] = entries.emplace_back(
-                    factory,
-                    config,
-                    endpoint
-                );
+                auto& [server, task] =
+                    entries.emplace_back(factory, config, endpoint);
 
                 if (!endpoint) throw std::runtime_error("Missing endpoint");
                 task = server.listen(endpoint->get());
@@ -81,9 +68,8 @@ namespace netcore {
                 entries.pop_back();
             }
 
-            if (entries.empty()) throw std::runtime_error(
-                "Failed to listen for connections"
-            );
+            if (entries.empty())
+                throw std::runtime_error("Failed to listen for connections");
 
             co_return list;
         }

@@ -9,18 +9,13 @@
 #include <timber/timber>
 
 namespace netcore {
-    auto connect(
-        std::string_view host,
-        std::string_view port
-    ) -> ext::task<socket> {
+    auto connect(std::string_view host, std::string_view port)
+        -> ext::task<socket> {
         auto addr = address(host, port);
 
         for (auto* res = addr.get(); res != nullptr; res = res->ai_next) {
-            auto sock = socket(
-                res->ai_family,
-                res->ai_socktype,
-                res->ai_protocol
-            );
+            auto sock =
+                socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
             if (co_await sock.connect(res->ai_addr, res->ai_addrlen)) {
                 TIMBER_DEBUG(
@@ -33,9 +28,9 @@ namespace netcore {
             }
         }
 
-        throw ext::system_error(fmt::format(
-            "Failed to connect to ({}:{})", host, port
-        ));
+        throw ext::system_error(
+            fmt::format("Failed to connect to ({}:{})", host, port)
+        );
     }
 
     auto connect(std::string_view path) -> ext::task<socket> {
@@ -50,23 +45,24 @@ namespace netcore {
             co_return sock;
         }
 
-        throw ext::system_error(fmt::format(
-            "Failed to connect to \"{}\"",
-            path
-        ));
+        throw ext::system_error(fmt::format("Failed to connect to \"{}\"", path)
+        );
     }
 
     auto connect(const endpoint& endpoint) -> ext::task<socket> {
-        return std::visit([](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
+        return std::visit(
+            [](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
 
-            if constexpr (std::is_same_v<T, inet_socket>) {
-                return connect(arg.host, arg.port);
-            }
+                if constexpr (std::is_same_v<T, inet_socket>) {
+                    return connect(arg.host, arg.port);
+                }
 
-            if constexpr (std::is_same_v<T, unix_socket>) {
-                return connect(arg.path.native());
-            }
-        }, endpoint);
+                if constexpr (std::is_same_v<T, unix_socket>) {
+                    return connect(arg.path.native());
+                }
+            },
+            endpoint
+        );
     }
 }

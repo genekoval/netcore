@@ -9,8 +9,9 @@
 namespace netcore::ssl {
     template <typename T>
     concept server_context = requires(T& t, socket&& client) {
-        { t.connection(std::forward<socket>(client)) } ->
-            std::same_as<ext::task<>>;
+        {
+            t.connection(std::forward<socket>(client))
+        } -> std::same_as<ext::task<>>;
     };
 
     template <server_context T>
@@ -21,10 +22,11 @@ namespace netcore::ssl {
         template <typename... Args>
         server(const context& ctx, Args&&... args) :
             inner(std::forward<Args>(args)...),
-            ctx(ctx)
-        {}
+            ctx(ctx) {}
 
-        auto close() -> void requires server_context_close<T> {
+        auto close() -> void
+        requires server_context_close<T>
+        {
             inner.close();
         }
 
@@ -35,11 +37,14 @@ namespace netcore::ssl {
         }
 
         auto listen(const address_type& addr) -> void
-        requires server_context_listen<T> {
+        requires server_context_listen<T>
+        {
             inner.listen(addr);
         }
 
-        auto shutdown() -> void requires server_context_shutdown<T> {
+        auto shutdown() -> void
+        requires server_context_shutdown<T>
+        {
             inner.shutdown();
         }
     };

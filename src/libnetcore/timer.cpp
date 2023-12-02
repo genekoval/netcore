@@ -16,10 +16,7 @@ namespace {
         const auto s = floor<seconds>(ns);
         const auto remainder = ns - s;
 
-        return {
-            .tv_sec = s.count(),
-            .tv_nsec = remainder.count()
-        };
+        return {.tv_sec = s.count(), .tv_nsec = remainder.count()};
     }
 
     auto to_nsec(const timespec& spec) -> nanoseconds {
@@ -28,17 +25,11 @@ namespace {
 }
 
 namespace netcore {
-    auto timer::realtime() -> timer {
-        return timer(CLOCK_REALTIME);
-    }
+    auto timer::realtime() -> timer { return timer(CLOCK_REALTIME); }
 
-    auto timer::monotonic() -> timer {
-        return timer(CLOCK_MONOTONIC);
-    }
+    auto timer::monotonic() -> timer { return timer(CLOCK_MONOTONIC); }
 
-    auto timer::boottime() -> timer {
-        return timer(CLOCK_BOOTTIME);
-    }
+    auto timer::boottime() -> timer { return timer(CLOCK_BOOTTIME); }
 
     auto timer::realtime_alarm() -> timer {
         return timer(CLOCK_REALTIME_ALARM);
@@ -50,8 +41,7 @@ namespace netcore {
 
     timer::timer(int clockid) :
         descriptor(timerfd_create(clockid, TFD_NONBLOCK | TFD_CLOEXEC)),
-        event(runtime::event::create(descriptor, EPOLLIN))
-    {
+        event(runtime::event::create(descriptor, EPOLLIN)) {
         if (!descriptor.valid()) {
             throw ext::system_error("failed to create timer");
         }
@@ -60,10 +50,8 @@ namespace netcore {
     }
 
     auto timer::disarm() -> void {
-        set(time {
-            .value = nanoseconds::zero(),
-            .interval = nanoseconds::zero()
-        });
+        set(time {.value = nanoseconds::zero(), .interval = nanoseconds::zero()}
+        );
 
         event->cancel();
     }
@@ -77,19 +65,17 @@ namespace netcore {
 
         return {
             .value = to_nsec(spec.it_value),
-            .interval = to_nsec(spec.it_interval)
-        };
+            .interval = to_nsec(spec.it_interval)};
     }
 
     auto timer::set(nanoseconds value) const -> void {
-        set(time { .value = value });
+        set(time {.value = value});
     }
 
     auto timer::set(const time& t) const -> void {
         const auto spec = itimerspec {
             .it_interval = from_nsec(t.interval),
-            .it_value = from_nsec(t.value)
-        };
+            .it_value = from_nsec(t.value)};
 
         if (timerfd_settime(descriptor, 0, &spec, nullptr) == -1) {
             throw ext::system_error("failed to set timer");
@@ -99,8 +85,9 @@ namespace netcore {
             "{} set for {:L}ns{}",
             *this,
             t.value.count(),
-            t.interval == nanoseconds::zero() ? "" :
-                fmt::format("; {:L}ns interval", t.interval.count())
+            t.interval == nanoseconds::zero()
+                ? ""
+                : fmt::format("; {:L}ns interval", t.interval.count())
         );
     }
 
