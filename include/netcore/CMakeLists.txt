@@ -1,0 +1,34 @@
+target_sources(netcore PUBLIC FILE_SET HEADERS FILES
+    address.hpp
+    async_thread.hpp
+    async_thread_pool.hpp
+    awaitable_thread_pool.hpp
+    buffer.hpp
+    buffered_reader.hpp
+    buffered_socket.hpp
+    buffered_writer.hpp
+    client.hpp
+    connect.hpp
+    endpoint.hpp
+    event.hpp
+    eventfd.hpp
+    except.hpp
+    fd.hpp
+    file.hpp
+    flags.hpp
+    mutex.hpp
+    netcore
+    pipe.hpp
+    runtime.hpp
+    server.hpp
+    server_list.hpp
+    server_socket.hpp
+    signalfd.h
+    socket.h
+    thread_pool.hpp
+    timer.hpp
+)
+
+add_subdirectory(detail)
+add_subdirectory(proc)
+add_subdirectory(ssl)

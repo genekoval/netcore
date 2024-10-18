@@ -1,0 +1,40 @@
+add_subdirectory(detail)
+add_subdirectory(proc)
+add_subdirectory(ssl)
+
+target_sources(netcore
+    PRIVATE
+        address.cpp
+        async_thread.cpp
+        async_thread_pool.cpp
+        awaitable_thread_pool.cpp
+        buffer.cpp
+        buffered_socket.cpp
+        CMakeLists.txt
+        connect.cpp
+        endpoint.cpp
+        event.cpp
+        eventfd.cpp
+        except.cpp
+        fd.cpp
+        file.cpp
+        flags.cpp
+        pipe.cpp
+        runtime.cpp
+        server_socket.cpp
+        signalfd.cpp
+        socket.cpp
+        thread_pool.cpp
+        timer.cpp
+)
+
+if(PROJECT_TESTING)
+    target_sources(netcore.test
+        PRIVATE
+            async_thread.test.cpp
+            event.test.cpp
+            mutex.test.cpp
+            server.test.cpp
+            timer.test.cpp
+    )
+endif()
